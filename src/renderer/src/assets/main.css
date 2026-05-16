@@ -4385,6 +4385,13 @@ body {
   color: var(--text-muted);
 }
 
+.models-modal-auto-badge {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .models-modal-field .input,
 .models-modal-field select.input {
   padding: 8px 12px;

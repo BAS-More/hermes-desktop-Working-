@@ -3,6 +3,7 @@ import { Plus, Trash, Search, X } from "../../assets/icons";
 import { PROVIDERS } from "../../constants";
 import { useI18n } from "../../components/useI18n";
 import BrandLogo from "../../components/common/BrandLogo";
+import { detectProviderFromUrl } from "./detect-provider";
 
 interface SavedModel {
   id: string;
@@ -34,6 +35,12 @@ function Models(): React.JSX.Element {
   const [formApiKey, setFormApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [formError, setFormError] = useState("");
+  // Whether the user has manually picked a value from the Provider dropdown
+  // for this open of the modal. While false, the dropdown follows whatever
+  // detectProviderFromUrl() infers from the Base URL field. Once the user
+  // touches the dropdown we stop overriding their choice.
+  const [providerTouched, setProviderTouched] = useState(false);
+  const [providerAutoFilled, setProviderAutoFilled] = useState(false);
 
   function resolveCustomEnvKey(url: string): string {
     if (!url) return "CUSTOM_API_KEY";
@@ -70,6 +77,8 @@ function Models(): React.JSX.Element {
     setFormApiKey("");
     setShowApiKey(false);
     setFormError("");
+    setProviderTouched(false);
+    setProviderAutoFilled(false);
     setShowModal(true);
   }
 
@@ -82,6 +91,9 @@ function Models(): React.JSX.Element {
     setFormApiKey("");
     setShowApiKey(false);
     setFormError("");
+    // Editing an existing entry — respect the saved provider, don't auto-overwrite it.
+    setProviderTouched(true);
+    setProviderAutoFilled(false);
     setShowModal(true);
   }
 
@@ -89,7 +101,27 @@ function Models(): React.JSX.Element {
     setShowModal(false);
     setEditingModel(null);
     setFormError("");
+    setProviderTouched(false);
+    setProviderAutoFilled(false);
   }
+
+  // Auto-detect provider from base URL while the modal is open and the user
+  // hasn't manually picked a provider yet. Detection runs on every URL
+  // change so backspacing the URL also clears the auto-fill flag.
+  useEffect(() => {
+    if (!showModal || providerTouched) {
+      if (!showModal) setProviderAutoFilled(false);
+      return;
+    }
+    const detected = detectProviderFromUrl(formBaseUrl);
+    if (detected && detected !== formProvider) {
+      setFormProvider(detected);
+      setProviderAutoFilled(true);
+    } else if (!detected && providerAutoFilled) {
+      // URL no longer matches; drop the badge but keep whatever's selected.
+      setProviderAutoFilled(false);
+    }
+  }, [formBaseUrl, showModal, providerTouched, formProvider, providerAutoFilled]);
 
   async function handleSave(): Promise<void> {
     const name = formName.trim();
@@ -279,11 +311,20 @@ function Models(): React.JSX.Element {
               <div className="models-modal-field">
                 <label className="models-modal-label">
                   {t("common.provider")}
+                  {providerAutoFilled && !providerTouched && (
+                    <span className="models-modal-auto-badge">
+                      &nbsp;· auto-detected from base URL
+                    </span>
+                  )}
                 </label>
                 <select
                   className="input"
                   value={formProvider}
-                  onChange={(e) => setFormProvider(e.target.value)}
+                  onChange={(e) => {
+                    setFormProvider(e.target.value);
+                    setProviderTouched(true);
+                    setProviderAutoFilled(false);
+                  }}
                 >
                   {PROVIDERS.options.map((p) => (
                     <option key={p.value} value={p.value}>
