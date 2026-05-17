@@ -67,16 +67,6 @@ sudo dnf install ./hermes-desktop-<version>.rpm
 
 > **Fedora users:** The `.rpm` is not GPG-signed. If your system enforces signature checking, append `--nogpgcheck` to the install command. Auto-update is not supported for `.rpm` builds (limitation of `electron-updater`); reinstall the new `.rpm` to update.
 
-### macOS
-
-> **macOS users:** The app is not code-signed or notarized. macOS will block it on first launch. To fix this, run the following after installing:
->
-> ```bash
-> xattr -cr "/Applications/Hermes Agent.app"
-> ```
->
-> Or right-click the app → **Open** → click **Open** in the confirmation dialog.
-
 ## Preview
 
 <table>
