@@ -28,15 +28,35 @@ import {
 
 const LOCAL_API_URL = "http://127.0.0.1:8642";
 
+/**
+ * Normalise a remote-mode URL the user typed into the connection
+ * settings.  Strips trailing slashes and, importantly, a trailing
+ * `/v1` segment — callers append `/v1/<path>` themselves, so leaving
+ * the user's `/v1` would produce `http://host/v1/v1/chat/completions`
+ * → 404.  Reported as #266 (multiple users entered the URL "with
+ * /v1" because the gateway's curl examples show that form).
+ *
+ * Also tolerates trailing whitespace and the rare `/v1/` (slash-suffixed)
+ * form.  Returns the cleaned string.
+ */
+export function normaliseRemoteUrl(raw: string): string {
+  let url = (raw || "").trim();
+  // Strip trailing slashes
+  url = url.replace(/\/+$/, "");
+  // Strip trailing `/v1` (callers append /v1/<path> themselves)
+  url = url.replace(/\/v1$/i, "");
+  return url;
+}
+
 export function getApiUrl(): string {
   const conn = getConnectionConfig();
   if (conn.mode === "ssh") {
     const sshUrl = getSshTunnelUrl();
     if (!sshUrl) throw new Error("SSH tunnel is not active");
-    return sshUrl;
+    return normaliseRemoteUrl(sshUrl);
   }
   if (conn.mode === "remote" && conn.remoteUrl) {
-    return conn.remoteUrl.replace(/\/+$/, "");
+    return normaliseRemoteUrl(conn.remoteUrl);
   }
   return LOCAL_API_URL;
 }
@@ -859,6 +879,18 @@ let gatewayProcess: ChildProcess | null = null;
 let gatewayStartedByApp = false;
 
 export function startGateway(profile?: string): boolean {
+  // Defensive: the local gateway is never the right thing to spawn in
+  // remote/SSH mode — the user is pointing at an off-machine server.
+  // Callers should already gate, but several IPC handlers historically
+  // forgot to (issue #266), and reaching `spawn(HERMES_PYTHON, …)` when
+  // there's no local hermes-agent install produces an uncaught ENOENT
+  // that pops a generic error dialog.  Refuse cleanly here.
+  if (isRemoteMode()) {
+    console.warn(
+      "[gateway] startGateway() called in remote/SSH mode — refusing local spawn",
+    );
+    return false;
+  }
   ensureInitialized();
   if (isGatewayRunning()) return false;
 
@@ -996,6 +1028,10 @@ export function testRemoteConnection(
 }
 
 export function restartGateway(profile?: string): void {
+  // Same defensive gate as startGateway — the local gateway has no role
+  // in remote/SSH mode.  Cheap to check; catches IPC paths that don't
+  // wrap their restart calls in an isRemoteMode() check.
+  if (isRemoteMode()) return;
   if (!gatewayStartedByApp && !isGatewayRunning()) return;
   stopGateway(true);
   setTimeout(() => {

@@ -415,12 +415,19 @@ function setupIPC(): void {
         return true;
       }
       setEnvValue(key, value, profile);
-      // Restart gateway so it picks up the new API key
-      if (
-        (isGatewayRunning() && key.endsWith("_API_KEY")) ||
+      // Restart gateway so it picks up the new API key.
+      // The earlier condition had a precedence bug —
+      //   `(isGatewayRunning() && _API_KEY) || _TOKEN || HF_TOKEN`
+      // — that triggered a restart for `_TOKEN`/`HF_TOKEN` writes even
+      // when no local gateway was running, which in remote mode hit the
+      // `startGateway` path with no local install (issue #266).
+      // restartGateway() now also self-gates on isRemoteMode(), so this
+      // is belt-and-braces, but the condition is fixed too for clarity.
+      const looksLikeCredential =
+        key.endsWith("_API_KEY") ||
         key.endsWith("_TOKEN") ||
-        key === "HF_TOKEN"
-      ) {
+        key === "HF_TOKEN";
+      if (isGatewayRunning() && looksLikeCredential) {
         restartGateway(profile);
       }
       return true;
@@ -723,12 +730,22 @@ function setupIPC(): void {
       await sshStartGateway(conn.ssh);
       return true;
     }
+    if (conn.mode === "remote") {
+      // The remote server runs its own gateway; nothing to start locally.
+      // Without this guard we'd fall through to `startGateway()` and
+      // spawn a non-existent local hermes-agent (issue #266).
+      return false;
+    }
     return startGateway();
   });
   ipcMain.handle("stop-gateway", async () => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh) {
       await sshStopGateway(conn.ssh);
+      return true;
+    }
+    if (conn.mode === "remote") {
+      // No local gateway to stop in pure remote mode.
       return true;
     }
     stopGateway(true);
