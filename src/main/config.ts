@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { HERMES_HOME } from "./installer";
 import { profilePaths, escapeRegex, safeWriteFile } from "./utils";
+import { getYamlPath } from "./yaml-path";
 
 // ── Connection Config (local / remote / ssh) ─────────────
 
@@ -213,12 +214,12 @@ export function getConfigValue(key: string, profile?: string): string | null {
   if (!existsSync(configFile)) return null;
 
   const content = readFileSync(configFile, "utf-8");
-  const regex = new RegExp(
-    `^\\s*${escapeRegex(key)}:\\s*["']?([^"'\\n#]+)["']?`,
-    "m",
-  );
-  const match = content.match(regex);
-  return match ? match[1].trim() : null;
+  // Use the indentation-aware reader so dotted keys like `memory.provider`,
+  // `network.force_ipv4`, `agent.service_tier` resolve correctly. The old
+  // regex matched only literal `dotted.key:` lines which don't exist in
+  // YAML, so nested lookups silently returned null and the UI rendered
+  // every memory provider as inactive, every nested toggle as default, etc.
+  return getYamlPath(content, key);
 }
 
 export function setConfigValue(
