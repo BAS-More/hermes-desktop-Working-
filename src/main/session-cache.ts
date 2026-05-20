@@ -222,3 +222,15 @@ export function updateSessionTitle(
     writeCache(cache);
   }
 }
+
+// Remove a session entry from the local cache. Called after the underlying
+// row in state.db is deleted so the renderer's fast-path cache doesn't keep
+// surfacing a session that no longer exists.
+export function removeSessionFromCache(sessionId: string): void {
+  const cache = readCache();
+  const next = cache.sessions.filter((s) => s.id !== sessionId);
+  if (next.length !== cache.sessions.length) {
+    cache.sessions = next;
+    writeCache(cache);
+  }
+}

@@ -79,7 +79,9 @@ export const ChatHeader = memo(function ChatHeader({
         {hasMessages && (
           <button
             className="btn-ghost chat-clear-btn"
-            onClick={onClear}
+            onClick={() => {
+              if (window.confirm(t("chat.clearChatConfirm"))) onClear();
+            }}
             title={t("chat.clearChat")}
           >
             <Trash size={16} />

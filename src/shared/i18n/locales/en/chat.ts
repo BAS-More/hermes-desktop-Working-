@@ -22,6 +22,7 @@ export default {
   deny: "Deny",
   newChat: "New chat (Cmd+N)",
   clearChat: "Clear chat",
+  clearChatConfirm: "Clear this conversation? This cannot be undone.",
   attach: "Attach files",
   removeAttachment: "Remove attachment",
   dropToAttach: "Drop files to attach",

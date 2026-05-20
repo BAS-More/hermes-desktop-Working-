@@ -106,11 +106,16 @@ function Chat({
       window.hermesAPI.abortChat();
       setIsLoading(false);
     }
+    const idToDelete = hermesSessionId ?? sessionId;
+    if (idToDelete) {
+      void window.hermesAPI.deleteSession(idToDelete);
+      void window.hermesAPI.clearStagedAttachments(idToDelete);
+    }
     setMessages([]);
     setHermesSessionId(null);
     setUsage(null);
     setToolProgress(null);
-  }, [isLoading, setMessages]);
+  }, [isLoading, hermesSessionId, sessionId, setMessages]);
 
   const localCommands = useLocalCommands({
     profile,
