@@ -75,6 +75,8 @@ export default {
   mistralHint: "Mistral 與 Codestral 模型",
   perplexityApiKey: "Perplexity API Key",
   perplexityHint: "Perplexity Sonar 聯網檢索模型",
+  nvidiaApiKey: "NVIDIA API Key",
+  nvidiaHint: "託管於 NVIDIA NIM 的模型（build.nvidia.com）",
   customApiKey: "自訂 API Key",
   customHint: "用於任意 OpenAI 相容端點的備用 Key",
   googleApiKey: "Google AI Studio Key",

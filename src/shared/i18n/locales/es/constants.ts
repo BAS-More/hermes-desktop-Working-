@@ -19,6 +19,7 @@ export default {
   localName: "Local",
   localDesc: "Compatible con OpenAI",
   localTag: "",
+  customOpenAICompatibleName: "Compatible con OpenAI / Local",
   // Local presets
   lmstudio: "LM Studio",
   ollama: "Ollama",
@@ -75,6 +76,8 @@ export default {
   mistralHint: "Modelos Mistral y Codestral",
   perplexityApiKey: "API key de Perplexity",
   perplexityHint: "Modelos Perplexity Sonar con búsqueda web",
+  nvidiaApiKey: "API key de NVIDIA",
+  nvidiaHint: "Modelos alojados en NVIDIA NIM (build.nvidia.com)",
   customApiKey: "API key personalizada",
   customHint: "Clave de respaldo para cualquier endpoint compatible con OpenAI",
   googleApiKey: "Clave de Google AI Studio",

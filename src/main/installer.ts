@@ -224,6 +224,7 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   minimax: "MINIMAX_API_KEY",
   glm: "GLM_API_KEY",
   kimi: "KIMI_API_KEY",
+  nvidia: "NVIDIA_API_KEY",
 };
 
 // When provider is "custom" or "auto", the desktop's setup flow falls

@@ -18,7 +18,11 @@ function providerLabelKey(value: string): string {
   return PROVIDERS.options.find((p) => p.value === value)?.label || value;
 }
 
-function Models(): React.JSX.Element {
+interface ModelsProps {
+  visible?: boolean;
+}
+
+function Models({ visible }: ModelsProps = {}): React.JSX.Element {
   const { t } = useI18n();
   const [models, setModels] = useState<SavedModel[]>([]);
   const [search, setSearch] = useState("");
@@ -67,6 +71,13 @@ function Models(): React.JSX.Element {
   useEffect(() => {
     loadModels();
   }, [loadModels]);
+
+  // Re-load whenever the Models pane becomes visible — entries added
+  // elsewhere (Providers save → addModel, chat picker → addModel) won't
+  // otherwise appear since the component is mounted once and kept alive.
+  useEffect(() => {
+    if (visible) loadModels();
+  }, [visible, loadModels]);
 
   function openAddModal(): void {
     setEditingModel(null);

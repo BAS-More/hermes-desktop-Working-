@@ -322,7 +322,7 @@ function Layout({
 
         {visitedViews.has("models") && (
           <div style={paneStyle("models")}>
-            <Models />
+            <Models visible={view === "models"} />
           </div>
         )}
 
