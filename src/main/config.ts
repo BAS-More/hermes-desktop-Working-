@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { HERMES_HOME } from "./installer";
+import { HERMES_HOME, expectedEnvKeyForModel } from "./installer";
 import {
   escapeRegex,
   getActiveProfileNameSync,
@@ -637,6 +637,64 @@ function upsertBlockChild(
   return `${content}${sep}${blockName}:\n  ${key}: "${value}"\n`;
 }
 
+/**
+ * Pick a value to write under model.api_key when the user configures a
+ * provider="custom" entry pointing at a known commercial host (DeepSeek,
+ * Groq, Mistral, etc.).
+ *
+ * Workaround for an upstream hermes-agent bug
+ * (NousResearch/hermes-agent #?? — see fathah/hermes-desktop#260): the
+ * gateway's ``_resolve_openrouter_runtime`` fallback chain reaches
+ * ``OPENAI_API_KEY``/``OPENROUTER_API_KEY`` when a bare ``custom``
+ * provider's credential pool is empty, which leaks unrelated keys to
+ * non-OpenAI endpoints (manifesting as ``****ired`` / 401 from
+ * api.deepseek.com).  Writing the matching env-var value to
+ * ``model.api_key`` makes ``cfg_api_key`` win that chain before the
+ * leak ever runs.
+ *
+ * Returns null when the provider/base_url combination doesn't match a
+ * known commercial host or no env var is set — leaves the user's
+ * config untouched for local LLMs (Ollama, vLLM, etc.).
+ */
+function pickAutoApiKeyForCustomProvider(
+  provider: string,
+  baseUrl: string,
+  profile?: string,
+): string | null {
+  if (provider !== "custom" || !baseUrl) return null;
+  const envKey = expectedEnvKeyForModel(provider, baseUrl);
+  if (!envKey) return null;
+  const env = readEnv(profile);
+  const raw = env[envKey];
+  if (!raw) return null;
+  const trimmed = raw.trim().replace(/^["']|["']$/g, "");
+  return trimmed || null;
+}
+
+/**
+ * Locate the `model:` block in a YAML document and return the offsets that
+ * bracket its body (children lines, not counting the `model:` header line).
+ * Returns null when there's no `model:` block at all.
+ *
+ * The boundaries are needed to scope `api_key` add/update/remove operations
+ * to the model block — every `auxiliary.*` subsection has its own
+ * `api_key:` line, and a naive `/^api_key:/m` replace would clobber those
+ * instead.
+ */
+function findModelBlockBody(
+  content: string,
+): { start: number; end: number } | null {
+  const headerMatch = content.match(/^model:[^\S\r\n]*\r?\n/m);
+  if (!headerMatch) return null;
+  const start = headerMatch.index! + headerMatch[0].length;
+  // The body runs until the next line that starts at column 0 (next
+  // top-level key) or end of file.  Blank lines stay inside the block.
+  const after = content.slice(start);
+  const nextTopMatch = after.match(/^\S/m);
+  const end = nextTopMatch ? start + nextTopMatch.index! : content.length;
+  return { start, end };
+}
+
 export function setModelConfig(
   provider: string,
   model: string,
@@ -660,6 +718,54 @@ export function setModelConfig(
   content = upsertBlockChild(content, "model", "default", model);
   if (baseUrl) {
     content = upsertBlockChild(content, "model", "base_url", baseUrl);
+  }
+
+  // Workaround for upstream gateway bug — see pickAutoApiKeyForCustomProvider.
+  // Scope all api_key add/update/remove operations to the `model:` block —
+  // `auxiliary.*` subsections each carry their own `api_key:` line and must
+  // not be touched.
+  const autoApiKey = pickAutoApiKeyForCustomProvider(provider, baseUrl, profile);
+  const body = findModelBlockBody(content);
+  if (body) {
+    const block = content.slice(body.start, body.end);
+    const apiKeyInBlock = /^[ \t]+api_key:\s*.*\r?\n?/m;
+    let newBlock = block;
+    if (autoApiKey) {
+      if (apiKeyInBlock.test(block)) {
+        newBlock = block.replace(
+          /^([ \t]+api_key:\s*).*$/m,
+          `$1"${autoApiKey}"`,
+        );
+      } else {
+        // Insert after base_url within the block, otherwise after provider.
+        const eolMatch = block.match(/\r?\n/);
+        const eol = eolMatch ? eolMatch[0] : "\n";
+        const indentMatch = block.match(/^([ \t]+)\S/m);
+        const indent = indentMatch ? indentMatch[1] : "  ";
+        const apiKeyLine = `${indent}api_key: "${autoApiKey}"${eol}`;
+        const afterBaseUrl = block.replace(
+          /^([ \t]+base_url:\s*"[^"]*"\s*\r?\n)/m,
+          `$1${apiKeyLine}`,
+        );
+        newBlock =
+          afterBaseUrl !== block
+            ? afterBaseUrl
+            : block.replace(
+                /^([ \t]+provider:\s*"[^"]*"\s*\r?\n)/m,
+                `$1${apiKeyLine}`,
+              );
+        // Last-resort: if neither base_url nor provider lines were found
+        // (config got hand-edited), prepend api_key to the block.
+        if (newBlock === block) {
+          newBlock = `${apiKeyLine}${block}`;
+        }
+      }
+    } else if (apiKeyInBlock.test(block)) {
+      newBlock = block.replace(apiKeyInBlock, "");
+    }
+    if (newBlock !== block) {
+      content = content.slice(0, body.start) + newBlock + content.slice(body.end);
+    }
   }
 
   // Disable smart_model_routing
