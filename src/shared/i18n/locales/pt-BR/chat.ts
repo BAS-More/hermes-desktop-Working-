@@ -48,6 +48,10 @@ export default {
   categoryTools: "Ferramentas",
   categoryInfo: "Informação",
   noUsageData: "Nenhum dado de uso ainda. Envie uma mensagem primeiro.",
+  media: {
+    open: "Abrir",
+    saveAs: "Salvar como…",
+  },
   commands: {
     new: "Iniciar um novo chat",
     clear: "Limpar o histórico da conversa",

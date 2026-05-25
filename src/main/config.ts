@@ -9,6 +9,7 @@ import {
   safeWriteFile,
 } from "./utils";
 import { getYamlPath } from "./yaml-path";
+import { canonicalProviderBaseUrl } from "./provider-registry";
 
 // ── Connection Config (local / remote / ssh) ─────────────
 
@@ -426,7 +427,18 @@ export function setConfigValue(
   value: string,
   profile?: string,
 ): void {
-  if (key === "API_SERVER_KEY") invalidateCache("apiServerKey:");
+  // Invalidate the apiServerKey cache when either of the two canonical
+  // gateway-secret locations is written: the legacy top-level
+  // `API_SERVER_KEY` *or* the hermes-agent canonical `api_server.token`
+  // path. Without the second check, editing `api_server.token` via the
+  // desktop would leave the cached value stale for up to the 5s TTL.
+  if (
+    key === "API_SERVER_KEY" ||
+    key === "api_server.token" ||
+    key.startsWith("api_server.")
+  ) {
+    invalidateCache("apiServerKey:");
+  }
   const { configFile } = profilePaths(profile);
   if (!existsSync(configFile)) return;
 
@@ -716,8 +728,26 @@ export function setModelConfig(
 
   content = upsertBlockChild(content, "model", "provider", provider);
   content = upsertBlockChild(content, "model", "default", model);
-  if (baseUrl) {
-    content = upsertBlockChild(content, "model", "base_url", baseUrl);
+
+  // Pick the effective base_url to write.  Precedence:
+  //   1. User-supplied `baseUrl` (the renderer passes this when the user
+  //      typed an explicit value into the "Base URL (optional)" field).
+  //   2. Otherwise, the canonical default for built-in providers
+  //      (DeepSeek → api.deepseek.com, Groq → api.groq.com, etc. — see
+  //      `provider-registry.ts`).
+  //   3. Otherwise (custom / auto / unknown provider with no baseUrl),
+  //      leave `base_url:` out of the model block entirely.
+  //
+  // Without (2), switching from a model with an explicit baseUrl (e.g.
+  // a previous OAuth Codex selection at `chatgpt.com/backend-api/codex`)
+  // to a built-in provider with no baseUrl in its library entry used to
+  // leave the stale URL in `config.yaml`. Chat then routed to the wrong
+  // host while still sending the new provider's key, producing a 401
+  // from OpenAI carrying e.g. a DeepSeek key. See issue analysis in
+  // PR description.
+  const effectiveBaseUrl = baseUrl || canonicalProviderBaseUrl(provider) || "";
+  if (effectiveBaseUrl) {
+    content = upsertBlockChild(content, "model", "base_url", effectiveBaseUrl);
   }
 
   // Workaround for upstream gateway bug — see pickAutoApiKeyForCustomProvider.
@@ -801,41 +831,97 @@ export function getHermesHome(profile?: string): string {
 
 /**
  * Resolve the API server's shared secret. Honoured by the local hermes
- * gateway (api_server.token in config.yaml / API_SERVER_KEY in .env) when
- * present; the desktop must include it as `Authorization: Bearer …` on
- * every chat request, otherwise the gateway responds with "Invalid API
- * key".
+ * gateway (`api_server.token` in `config.yaml` / `API_SERVER_KEY` in
+ * `.env`) when present; the desktop must include it as
+ * `Authorization: Bearer …` on every chat request, otherwise the gateway
+ * responds with "Invalid API key" / "Session continuation requires API
+ * key authentication".
  *
- * Search order: profile's config.yaml → default config.yaml → profile's
- * .env → default .env. Returns "" when none configured.
+ * Search order — explicit overrides first, canonical locations after:
+ *
+ *   1. Profile `config.yaml` top-level `API_SERVER_KEY` (legacy override)
+ *   2. Default `config.yaml` top-level `API_SERVER_KEY` (legacy override)
+ *   3. Profile `.env` `API_SERVER_KEY` (matches what the gateway reads)
+ *   4. Default `.env` `API_SERVER_KEY`
+ *   5. Profile `config.yaml` `api_server.token` (canonical hermes-agent
+ *      gateway-secret location — issue #333)
+ *   6. Default `config.yaml` `api_server.token`
+ *
+ * The `api_server.token` candidates are the bug fix for #333: users who
+ * ran `hermes setup` (which writes `api_server.token` into `config.yaml`
+ * but does not touch `.env`) would otherwise see chat fail on the
+ * second message with *"Session continuation requires API key
+ * authentication. Configure API_SERVER_KEY to enable this feature."*
+ *
+ * `.env` is checked **before** `api_server.token` so that the
+ * documented manual workaround — add `API_SERVER_KEY=…` to `.env` to
+ * unblock the second message — still takes precedence when a user has
+ * set it explicitly.
+ *
+ * Returns "" when none of the six locations are configured.
  *
  * Hot path: called per chat message and per error-probe. Reuse the same
- * 5s TTL cache as readEnv() so we don't re-parse config.yaml + .env
- * every call. Invalidated by setEnvValue / setConfigValue when the key
- * being written is API_SERVER_KEY.
+ * 5s TTL cache as `readEnv()` so we do not re-parse `config.yaml` +
+ * `.env` every call. Invalidated by `setEnvValue` / `setConfigValue`
+ * when the key being written is `API_SERVER_KEY` or any
+ * `api_server.*` subkey.
  */
 export function getApiServerKey(profile?: string): string {
   const cacheKey = `apiServerKey:${profile || "default"}`;
   const cached = getCached<string>(cacheKey);
   if (cached !== undefined) return cached;
 
-  const candidates = [
-    getConfigValue("API_SERVER_KEY", profile),
-    profile && profile !== "default" ? getConfigValue("API_SERVER_KEY") : null,
-    readEnv(profile).API_SERVER_KEY || null,
-    profile && profile !== "default" ? readEnv().API_SERVER_KEY || null : null,
-  ];
-
-  let value = "";
-  for (const candidate of candidates) {
-    const trimmed = String(candidate || "").trim();
-    if (trimmed) {
-      value = trimmed;
-      break;
-    }
-  }
+  const value = resolveApiServerKey({
+    configTopLevelProfile: getConfigValue("API_SERVER_KEY", profile),
+    configTopLevelDefault:
+      profile && profile !== "default"
+        ? getConfigValue("API_SERVER_KEY")
+        : null,
+    envProfile: readEnv(profile).API_SERVER_KEY ?? null,
+    envDefault:
+      profile && profile !== "default"
+        ? (readEnv().API_SERVER_KEY ?? null)
+        : null,
+    apiServerTokenProfile: getConfigValue("api_server.token", profile),
+    apiServerTokenDefault:
+      profile && profile !== "default"
+        ? getConfigValue("api_server.token")
+        : null,
+  });
   setCache(cacheKey, value);
   return value;
+}
+
+/**
+ * Pure precedence-resolution for the API server's shared secret. Split
+ * out from `getApiServerKey` so the candidate-ordering policy can be
+ * unit-tested without filesystem fixtures (the I/O — `getConfigValue` /
+ * `readEnv` — happens in the caller).
+ *
+ * Returns the first non-empty trimmed candidate, or "" when all six
+ * sources are empty / null / whitespace.
+ */
+export function resolveApiServerKey(sources: {
+  configTopLevelProfile: string | null;
+  configTopLevelDefault: string | null;
+  envProfile: string | null;
+  envDefault: string | null;
+  apiServerTokenProfile: string | null;
+  apiServerTokenDefault: string | null;
+}): string {
+  const order: (string | null)[] = [
+    sources.configTopLevelProfile,
+    sources.configTopLevelDefault,
+    sources.envProfile,
+    sources.envDefault,
+    sources.apiServerTokenProfile,
+    sources.apiServerTokenDefault,
+  ];
+  for (const candidate of order) {
+    const trimmed = String(candidate ?? "").trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
 }
 
 // ── Platform enabled/disabled ─────────────────────────────

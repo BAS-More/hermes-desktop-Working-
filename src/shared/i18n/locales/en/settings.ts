@@ -3,6 +3,7 @@ export default {
   sections: {
     hermesAgent: "Hermes Agent",
     appearance: "Appearance",
+    privacy: "Privacy",
     credentialPool: "Credential Pool",
   },
   theme: {
@@ -22,8 +23,18 @@ export default {
     hint: "Choose the interface language",
   },
   analytics: {
-    label: "Analytics",
-    hint: "Help improve Hermes by sending anonymous usage data. No personal information or chat content is collected.",
+    label: "Send anonymous usage analytics",
+    hint: "Helps improve Hermes Desktop by sending anonymous, aggregated usage data to the project's PostHog instance. You can turn this off at any time.",
+    disclosure: {
+      uuid: "A random per-install identifier stored only on this device (no name, email, or account info).",
+      platform: "Your operating system, Electron version, and Node.js version.",
+      navigation:
+        "Which screens you visit inside the app (e.g. Chat, Sessions, Settings). No chat content, prompts, model responses, or file contents are collected.",
+      endpoint:
+        "Data is sent to us.i.posthog.com (PostHog US cloud). Session recordings and pageview auto-capture are disabled.",
+      notCollected:
+        "Never collected: chat messages, file paths, API keys, model configuration, account credentials.",
+    },
   },
   notDetected: "Not detected",
   updatedSuccessfully: "Updated successfully!",

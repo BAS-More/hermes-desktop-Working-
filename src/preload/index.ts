@@ -83,6 +83,23 @@ const hermesAPI = {
   runClawMigrate: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("run-claw-migrate"),
 
+  // OAuth provider sign-in
+  oauthLogin: (
+    provider: string,
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("oauth-login", provider, profile),
+  cancelOAuthLogin: (): Promise<boolean> =>
+    ipcRenderer.invoke("oauth-login-cancel"),
+  onOAuthLoginProgress: (callback: (chunk: string) => void): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      chunk: unknown,
+    ): void => callback(String(chunk));
+    ipcRenderer.on("oauth-login-progress", handler);
+    return () => ipcRenderer.removeListener("oauth-login-progress", handler);
+  },
+
   getLocale: (): Promise<AppLocale> => ipcRenderer.invoke("get-locale"),
   setLocale: (locale: AppLocale): Promise<AppLocale> =>
     ipcRenderer.invoke("set-locale", locale),
@@ -210,6 +227,21 @@ const hermesAPI = {
   copyToClipboard: (text: string): Promise<void> =>
     ipcRenderer.invoke("copy-to-clipboard", text),
 
+  // Media (agent-generated images / files — issue #299)
+  readMediaFile: (filePath: string): Promise<string | null> =>
+    ipcRenderer.invoke("read-media-file", filePath),
+  saveMediaFile: (src: string, name: string): Promise<boolean> =>
+    ipcRenderer.invoke("save-media-file", src, name),
+  mediaFileExists: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke("media-file-exists", filePath),
+  showMediaMenu: (
+    src: string,
+    name: string,
+    labels: { open: string; saveAs: string },
+  ): void => {
+    ipcRenderer.send("show-media-menu", src, name, labels);
+  },
+
   // Resolve the absolute filesystem path for a File coming from drag-drop
   // or the file picker.  Returns "" for blobs that have no origin path
   // (e.g. clipboard paste) — caller should stageAttachment for those.
@@ -254,6 +286,18 @@ const hermesAPI = {
       callback(chunk);
     ipcRenderer.on("chat-chunk", handler);
     return () => ipcRenderer.removeListener("chat-chunk", handler);
+  },
+
+  /** Streaming reasoning / thinking tokens — separate from `onChatChunk`
+   *  so the renderer can render a "thinking" bubble that grows
+   *  independently of the assistant's content (#352). */
+  onChatReasoningChunk: (
+    callback: (chunk: string) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, chunk: string): void =>
+      callback(chunk);
+    ipcRenderer.on("chat-reasoning-chunk", handler);
+    return () => ipcRenderer.removeListener("chat-reasoning-chunk", handler);
   },
 
   onChatDone: (callback: (sessionId?: string) => void): (() => void) => {

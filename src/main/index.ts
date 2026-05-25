@@ -15,6 +15,7 @@ import icon from "../../resources/icon.png?asset";
 import type { Attachment } from "../shared/attachments";
 import { stageAttachment, clearStagedAttachments } from "./attachment-staging";
 import { discoverProviderModels } from "./model-discovery";
+import { readMediaAsDataUrl, saveMedia, mediaFileExists } from "./media";
 import {
   checkInstallStatus,
   verifyInstall,
@@ -37,6 +38,11 @@ import {
   InstallProgress,
 } from "./installer";
 import { updaterLogger } from "./updater-log";
+import {
+  runHermesAuthLogin,
+  cancelHermesAuthLogin,
+  detectDeviceCode,
+} from "./hermes-auth";
 import {
   isRemoteMode,
   isRemoteOnlyMode,
@@ -466,6 +472,42 @@ function setupIPC(): void {
     }
   });
 
+  // OAuth provider sign-in — spawns `hermes auth add <provider> --type
+  // oauth`, streaming the CLI's output to the renderer's sign-in modal.
+  ipcMain.handle(
+    "oauth-login",
+    (event, provider: string, profile?: string) => {
+      // Codex uses a device-code flow: it prints a URL + code instead
+      // of opening a browser. Watch the stream for that prompt, then
+      // open the page and pre-copy the code so the user just pastes.
+      let buffer = "";
+      let deviceHandled = false;
+      return runHermesAuthLogin(
+        provider,
+        (chunk) => {
+          // The user can close the modal mid-flow before cancelHermesAuthLogin
+          // tears down the subprocess; any send on a destroyed sender throws.
+          if (event.sender.isDestroyed()) return;
+          event.sender.send("oauth-login-progress", chunk);
+          if (deviceHandled) return;
+          buffer += chunk;
+          const device = detectDeviceCode(buffer);
+          if (device) {
+            deviceHandled = true;
+            openExternalUrl(device.url);
+            clipboard.writeText(device.code);
+            event.sender.send(
+              "oauth-login-progress",
+              `\n→ Code ${device.code} copied to clipboard — opening browser...\n`,
+            );
+          }
+        },
+        profile,
+      );
+    },
+  );
+  ipcMain.handle("oauth-login-cancel", () => cancelHermesAuthLogin());
+
   // Configuration (profile-aware)
   ipcMain.handle("get-locale", () => getAppLocale());
   ipcMain.handle("set-locale", (_event, locale: AppLocale) =>
@@ -747,6 +789,15 @@ function setupIPC(): void {
               currentChatAbort();
             }
           },
+          onReasoningChunk: (chunk) => {
+            // Forward reasoning/thinking tokens on a dedicated channel so
+            // the renderer can render the thinking bubble live during the
+            // stream rather than waiting for a focus-change refresh (#352).
+            // Same renderer-gone abort guard as the content channel.
+            if (!safeSend("chat-reasoning-chunk", chunk) && currentChatAbort) {
+              currentChatAbort();
+            }
+          },
           onDone: (sessionId) => {
             currentChatAbort = null;
             safeSend("chat-done", sessionId || "");
@@ -811,6 +862,61 @@ function setupIPC(): void {
   ipcMain.handle("copy-to-clipboard", (_event, text: string) => {
     clipboard.writeText(typeof text === "string" ? text : "");
   });
+
+  // Media — render agent-generated images and save them to disk (#299).
+  ipcMain.handle("read-media-file", (_event, filePath: string) =>
+    readMediaAsDataUrl(filePath),
+  );
+  ipcMain.handle("save-media-file", (event, src: string, name: string) =>
+    saveMedia(src, name, BrowserWindow.fromWebContents(event.sender)),
+  );
+  ipcMain.handle("media-file-exists", (_event, filePath: string) =>
+    mediaFileExists(filePath),
+  );
+
+  // Native right-click menu for a rendered media element (#299): "Open"
+  // hands the file to the OS default handler (or a web URL to the browser),
+  // "Save as…" writes a copy elsewhere. Labels are passed in from the
+  // renderer so the menu honours the active UI locale.
+  ipcMain.on(
+    "show-media-menu",
+    (
+      event,
+      src: string,
+      name: string,
+      labels: { open: string; saveAs: string },
+    ) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win || !src) return;
+      const isUrl = /^https?:\/\//i.test(src);
+      const isData = src.startsWith("data:");
+      const template: Electron.MenuItemConstructorOptions[] = [];
+      // "Open" needs a real target — a local file or a web URL. A data:
+      // URL is inline bytes with nothing to hand to the OS, so it is
+      // save-only.
+      if (!isData) {
+        template.push({
+          label: labels.open,
+          click: () => {
+            if (isUrl) {
+              openExternalUrl(src);
+            } else {
+              shell.openPath(src).then((err) => {
+                if (err) console.error("[media] open failed:", err);
+              });
+            }
+          },
+        });
+      }
+      template.push({
+        label: labels.saveAs,
+        click: () => {
+          void saveMedia(src, name, win);
+        },
+      });
+      Menu.buildFromTemplate(template).popup({ window: win });
+    },
+  );
 
   // Attachment staging — for pasted blobs that have no filesystem origin.
   ipcMain.handle(
@@ -1065,9 +1171,13 @@ function setupIPC(): void {
   );
   ipcMain.handle("sync-session-cache", () => {
     const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh)
-      return sshListCachedSessions(conn.ssh, 50);
-    return syncSessionCache();
+    if (conn.mode === "ssh" && conn.ssh) return sshListCachedSessions(conn.ssh, 50);
+    try {
+      return syncSessionCache();
+    } catch (error) {
+      console.error("sync-session-cache failed; using local cache", error);
+      return listCachedSessions(50);
+    }
   });
   ipcMain.handle(
     "update-session-title",

@@ -120,8 +120,19 @@ export const HERMES_HOME =
   defaultHermesHome();
 export const HERMES_REPO = join(HERMES_HOME, "hermes-agent");
 export const HERMES_VENV = join(HERMES_REPO, "venv");
+// On Windows, use `pythonw.exe` (the GUI-subsystem interpreter that ships in
+// every venv) instead of `python.exe` so that subprocess spawns don't flash
+// a blank console window before `windowsHide: true` / CREATE_NO_WINDOW takes
+// effect. Issue #342: on every chat send the `sendMessageViaCli` fallback
+// path spawned `python.exe`, and the console appeared for a few hundred ms
+// despite `windowsHide: true` — a well-known race between console allocation
+// and CREATE_NO_WINDOW on console-subsystem child binaries. `pythonw.exe`
+// is linked as Windows subsystem, so the OS can never allocate a console
+// for it regardless of creation flags. It's a bit-identical interpreter
+// otherwise — same modules, same stdout/stderr behaviour over piped stdio
+// (which is what every call site here uses).
 export const HERMES_PYTHON = IS_WINDOWS
-  ? join(HERMES_VENV, "Scripts", "python.exe")
+  ? join(HERMES_VENV, "Scripts", "pythonw.exe")
   : join(HERMES_VENV, "bin", "python");
 export const HERMES_SCRIPT = IS_WINDOWS
   ? join(HERMES_VENV, "Scripts", "hermes.exe")

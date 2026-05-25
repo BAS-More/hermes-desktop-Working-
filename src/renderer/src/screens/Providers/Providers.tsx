@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { SETTINGS_SECTIONS, PROVIDERS } from "../../constants";
+import { SETTINGS_SECTIONS, PROVIDERS, OAUTH_PROVIDERS } from "../../constants";
 import { useI18n } from "../../components/useI18n";
 import BrandLogo from "../../components/common/BrandLogo";
 import { useDiscoveredModels } from "../../hooks/useDiscoveredModels";
+import OAuthLoginModal from "../../components/OAuthLoginModal";
+import { KeyRound } from "../../assets/icons";
 
 function Providers({
   profile,
@@ -33,6 +35,11 @@ function Providers({
   const [poolProvider, setPoolProvider] = useState("");
   const [poolNewKey, setPoolNewKey] = useState("");
   const [poolNewLabel, setPoolNewLabel] = useState("");
+
+  // OAuth sign-in modal — holds the provider def being authenticated.
+  const [oauthModal, setOauthModal] = useState<
+    (typeof OAUTH_PROVIDERS)[number] | null
+  >(null);
 
   // Per-key debounce timers for env auto-save on change. Previously env
   // values were persisted only on input blur, so users who clicked the
@@ -517,6 +524,43 @@ function Providers({
           </div>
         );
       })}
+
+      <div className="settings-section">
+        <div className="settings-section-title">
+          {t("providers.oauth.sectionTitle")}
+        </div>
+        <div className="settings-field-hint" style={{ marginBottom: 10 }}>
+          {t("providers.oauth.sectionHint")}
+        </div>
+        <div className="provider-keys-grid">
+          {OAUTH_PROVIDERS.map((p) => (
+            <div key={p.id} className="provider-key-card">
+              <div className="provider-key-card-head">
+                <BrandLogo provider={p.id} size={22} />
+                <span className="provider-key-card-title">{p.name}</span>
+              </div>
+              <div className="settings-field-hint">{t(p.desc)}</div>
+              <button
+                className="btn btn-secondary btn-sm oauth-signin-btn"
+                aria-label={`${t("providers.oauth.signIn")} — ${p.name}`}
+                onClick={() => setOauthModal(p)}
+              >
+                <KeyRound size={14} />
+                {t("providers.oauth.signIn")}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {oauthModal && (
+        <OAuthLoginModal
+          provider={oauthModal.id}
+          providerLabel={oauthModal.name}
+          profile={profile}
+          onClose={() => setOauthModal(null)}
+        />
+      )}
     </div>
   );
 }

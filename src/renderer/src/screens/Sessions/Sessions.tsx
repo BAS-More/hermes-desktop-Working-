@@ -177,9 +177,17 @@ function Sessions({
 
   const loadSessions = useCallback(async (): Promise<void> => {
     setLoading(true);
-    const cached = await window.hermesAPI.listCachedSessions(50);
-    if (cached.length > 0) {
-      setSessions(cached);
+    try {
+      const cached = await window.hermesAPI.listCachedSessions(50);
+      if (cached.length > 0) {
+        setSessions(cached);
+      }
+
+      const synced = await window.hermesAPI.syncSessionCache();
+      setSessions(synced.slice(0, 50));
+    } catch (error) {
+      console.error("Failed to load sessions", error);
+    } finally {
       setLoading(false);
     }
     await refreshSessions();

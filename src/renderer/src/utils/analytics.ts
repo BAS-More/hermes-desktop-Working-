@@ -52,6 +52,17 @@ export function initAnalytics(): void {
     capture_pageleave: false,
     disable_session_recording: true, // Privacy-first: no session recording
     persistence: "localStorage",
+    // Privacy hardening:
+    //  - respect_dnt: honour the user's "Do Not Track" preference if set.
+    //  - mask_personal_data_properties: auto-mask common PII patterns
+    //    (emails, names) from any properties we ever pass to capture().
+    // Note: full IP-address suppression is NOT possible from the client —
+    // PostHog's deprecated `ip: false` option is a no-op. IP capture must
+    // be disabled server-side in the PostHog project settings
+    // ("Discard IP data"). See:
+    // https://posthog.com/tutorials/web-redact-properties#hiding-customer-ip-address
+    respect_dnt: true,
+    mask_personal_data_properties: true,
     loaded: () => {
       posthog.identify(getOrCreateAnonymousId(), {
         app_version: window.electron?.process?.versions?.electron || "unknown",

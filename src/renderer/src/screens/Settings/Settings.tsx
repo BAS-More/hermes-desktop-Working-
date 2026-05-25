@@ -861,6 +861,12 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
             {t("settings.language.hint")}
           </div>
         </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">
+          {t("settings.sections.privacy")}
+        </div>
         <div className="settings-field">
           <label className="settings-field-label">
             {t("settings.analytics.label")}
@@ -883,6 +889,16 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
           <div className="settings-field-hint">
             {t("settings.analytics.hint")}
           </div>
+          <ul
+            className="settings-field-hint"
+            style={{ paddingLeft: "1.25em", marginTop: 4 }}
+          >
+            <li>{t("settings.analytics.disclosure.uuid")}</li>
+            <li>{t("settings.analytics.disclosure.platform")}</li>
+            <li>{t("settings.analytics.disclosure.navigation")}</li>
+            <li>{t("settings.analytics.disclosure.endpoint")}</li>
+            <li>{t("settings.analytics.disclosure.notCollected")}</li>
+          </ul>
         </div>
       </div>
 

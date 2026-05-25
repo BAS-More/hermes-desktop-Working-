@@ -23,25 +23,10 @@ import {
   HERMES_HOME,
   getEnhancedPath,
 } from "./installer";
-
-/** Canonical inference base URL for each named provider, mirroring
- *  hermes-agent's PROVIDER_REGISTRY defaults.  Only the providers whose
- *  `/models` endpoint we know responds usefully are listed; everything
- *  else falls through to caller-supplied baseUrl or no discovery. */
-const PROVIDER_BASE_URLS: Record<string, string> = {
-  openai: "https://api.openai.com/v1",
-  openrouter: "https://openrouter.ai/api/v1",
-  deepseek: "https://api.deepseek.com/v1",
-  groq: "https://api.groq.com/openai/v1",
-  mistral: "https://api.mistral.ai/v1",
-  together: "https://api.together.xyz/v1",
-  fireworks: "https://api.fireworks.ai/inference/v1",
-  cerebras: "https://api.cerebras.ai/v1",
-  perplexity: "https://api.perplexity.ai",
-  huggingface: "https://router.huggingface.co/v1",
-  zai: "https://api.z.ai/api/paas/v4",
-  anthropic: "https://api.anthropic.com/v1",
-};
+// PROVIDER_BASE_URLS lives in its own module so `config.ts` can use the
+// same lookup without pulling in this whole file (and triggering a
+// circular import via `model-discovery → config → ...`).
+import { PROVIDER_BASE_URLS } from "./provider-registry";
 
 /** Providers whose `/models` we never call — either they don't expose it,
  *  use a different protocol, or rely on OAuth credentials we can't

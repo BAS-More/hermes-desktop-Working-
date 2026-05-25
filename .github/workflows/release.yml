@@ -81,6 +81,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Rebuild native dependencies for target arch
+        run: npx electron-builder install-app-deps --arch=${{ matrix.arch }}
+
       - name: Build app
         env:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
@@ -111,6 +114,19 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.ASC_ISSUER_ID }}
         run: npx electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
+
+      - name: Verify native module architecture
+        run: |
+          set -euo pipefail
+          NODE_FILE="dist/mac-${{ matrix.arch }}/Hermes Agent.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          if [ ! -f "$NODE_FILE" ]; then
+            NODE_FILE="dist/mac/Hermes Agent.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          fi
+          file "$NODE_FILE"
+          case "${{ matrix.arch }}" in
+            x64) file "$NODE_FILE" | grep -q "x86_64" ;;
+            arm64) file "$NODE_FILE" | grep -q "arm64" ;;
+          esac
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

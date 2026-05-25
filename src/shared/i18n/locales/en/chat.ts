@@ -51,6 +51,10 @@ export default {
   categoryTools: "Tools",
   categoryInfo: "Info",
   noUsageData: "No usage data yet. Send a message first.",
+  media: {
+    open: "Open",
+    saveAs: "Save as…",
+  },
   commands: {
     new: "Start a new chat",
     clear: "Clear conversation history",

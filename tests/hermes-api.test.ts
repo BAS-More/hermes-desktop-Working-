@@ -216,7 +216,13 @@ describe("sendMessageViaApi forwards resumeSessionId", () => {
     expect(headers["X-Hermes-Session-Id"]).toBe(testSessionId);
   });
 
-  it("omits the X-Hermes-Session-Id header for a fresh session", async () => {
+  it("generates a fresh `desk-`-prefixed X-Hermes-Session-Id when no resumeSessionId is passed", async () => {
+    // Pin the new-chat session-id behaviour: instead of letting the
+    // gateway fall back to its `_derive_chat_session_id` fingerprint
+    // (sha256(system_prompt + first_user_message)[:16]), the desktop
+    // generates `desk-<ms>-<uuid>` per fresh chat and ships it via the
+    // header. The fingerprint collides across all chats whose first
+    // message is the same — see NousResearch/hermes-agent#7484.
     await sendMessage(
       "hello",
       {
@@ -234,6 +240,38 @@ describe("sendMessageViaApi forwards resumeSessionId", () => {
     expect(chatRequest).toBeDefined();
     const headers = chatRequest!.options.headers as Record<string, string>;
 
-    expect(headers).not.toHaveProperty("X-Hermes-Session-Id");
+    expect(headers).toHaveProperty("X-Hermes-Session-Id");
+    expect(headers["X-Hermes-Session-Id"]).toMatch(
+      /^desk-\d{13,}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("generates a different X-Hermes-Session-Id on each fresh send (no fingerprint collision)", async () => {
+    // The same first message twice MUST NOT produce the same session
+    // id — the whole point of the fix.
+    await sendMessage(
+      "Hello there",
+      { onChunk: () => {}, onDone: () => {}, onError: () => {} },
+      "default",
+      undefined,
+    );
+    await sendMessage(
+      "Hello there",
+      { onChunk: () => {}, onDone: () => {}, onError: () => {} },
+      "default",
+      undefined,
+    );
+
+    const chatRequests = capturedRequests.filter((r) =>
+      r.url.includes("/v1/chat/completions"),
+    );
+    expect(chatRequests.length).toBeGreaterThanOrEqual(2);
+    const ids = chatRequests.map(
+      (r) =>
+        (r.options.headers as Record<string, string>)["X-Hermes-Session-Id"],
+    );
+    expect(ids[0]).toBeTruthy();
+    expect(ids[1]).toBeTruthy();
+    expect(ids[0]).not.toBe(ids[1]);
   });
 });

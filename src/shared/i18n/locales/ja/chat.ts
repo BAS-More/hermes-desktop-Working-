@@ -47,6 +47,10 @@ export default {
   categoryInfo: "情報",
   noUsageData:
     "まだ使用データがありません。まずメッセージを送ってみてください。",
+  media: {
+    open: "開く",
+    saveAs: "名前を付けて保存…",
+  },
   commands: {
     new: "新しいチャットを開始",
     clear: "会話履歴をクリア",

@@ -48,6 +48,10 @@ export default {
   categoryTools: "Alat",
   categoryInfo: "Info",
   noUsageData: "Belum ada data penggunaan. Kirim pesan terlebih dahulu.",
+  media: {
+    open: "Buka",
+    saveAs: "Simpan sebagai…",
+  },
   commands: {
     new: "Mulai chat baru",
     clear: "Bersihkan riwayat percakapan",

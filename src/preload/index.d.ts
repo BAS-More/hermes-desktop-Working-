@@ -139,6 +139,14 @@ interface HermesAPI {
   checkOpenClaw: () => Promise<{ found: boolean; path: string | null }>;
   runClawMigrate: () => Promise<{ success: boolean; error?: string }>;
 
+  // OAuth provider sign-in
+  oauthLogin: (
+    provider: string,
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  cancelOAuthLogin: () => Promise<boolean>;
+  onOAuthLoginProgress: (callback: (chunk: string) => void) => () => void;
+
   getLocale: () => Promise<AppLocale>;
   setLocale: (locale: AppLocale) => Promise<AppLocale>;
 
@@ -217,6 +225,14 @@ interface HermesAPI {
   onContextMenuSelectBubble: (
     callback: (point: { x: number; y: number }) => void,
   ) => () => void;
+  readMediaFile: (filePath: string) => Promise<string | null>;
+  saveMediaFile: (src: string, name: string) => Promise<boolean>;
+  mediaFileExists: (filePath: string) => Promise<boolean>;
+  showMediaMenu: (
+    src: string,
+    name: string,
+    labels: { open: string; saveAs: string },
+  ) => void;
   getPathForFile: (file: File) => string;
   stageAttachment: (
     sessionId: string,
@@ -235,6 +251,7 @@ interface HermesAPI {
     cached: boolean;
   }>;
   onChatChunk: (callback: (chunk: string) => void) => () => void;
+  onChatReasoningChunk: (callback: (chunk: string) => void) => () => void;
   onChatDone: (callback: (sessionId?: string) => void) => () => void;
   onChatToolProgress: (callback: (tool: string) => void) => () => void;
   onChatUsage: (

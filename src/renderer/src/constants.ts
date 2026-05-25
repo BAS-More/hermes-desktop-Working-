@@ -188,6 +188,36 @@ export const PROVIDERS = {
   ],
 };
 
+// Subscription / OAuth-plan providers — these authenticate through an
+// interactive browser login (`hermes auth add <id> --type oauth`) rather
+// than a static API key. The Providers screen renders a "Sign in" card
+// for each. Values must match hermes-agent's provider registry.
+export interface OAuthProviderDef {
+  id: string;
+  name: string;
+  desc: string;
+}
+
+export const OAUTH_PROVIDERS: OAuthProviderDef[] = [
+  {
+    id: "openai-codex",
+    name: "ChatGPT (Codex Plan)",
+    desc: "providers.oauth.codexDesc",
+  },
+  { id: "xai-oauth", name: "xAI Grok (OAuth)", desc: "providers.oauth.xaiDesc" },
+  { id: "qwen-oauth", name: "Qwen (OAuth)", desc: "providers.oauth.qwenDesc" },
+  {
+    id: "google-gemini-cli",
+    name: "Gemini (CLI OAuth)",
+    desc: "providers.oauth.geminiDesc",
+  },
+  {
+    id: "minimax-oauth",
+    name: "MiniMax (OAuth)",
+    desc: "providers.oauth.minimaxDesc",
+  },
+];
+
 export interface LocalPreset {
   id: string;
   name: string;

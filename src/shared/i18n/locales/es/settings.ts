@@ -3,7 +3,19 @@ export default {
   sections: {
     hermesAgent: "Hermes Agent",
     appearance: "Apariencia",
+    privacy: "Privacidad",
     credentialPool: "Grupo de credenciales",
+  },
+  analytics: {
+    label: "Enviar analíticas de uso anónimas",
+    hint: "Ayuda a mejorar Hermes enviando datos de uso anónimos y agregados a la instancia PostHog del proyecto (alojada en la UE). Puedes desactivarlo en cualquier momento.",
+    disclosure: {
+      uuid: "Un identificador aleatorio por instalación almacenado únicamente en este dispositivo (sin nombre, correo electrónico ni datos de cuenta).",
+      platform: "Tu sistema operativo, versión de Electron y versión de Node.js.",
+      navigation: "Qué pantallas visitas dentro de la aplicación (p. ej. Chat, Sesiones, Configuración). No se recopila contenido de chats, prompts, respuestas del modelo ni contenido de archivos.",
+      endpoint: "Los datos se envían a eu.i.posthog.com (nube europea de PostHog). Las grabaciones de sesión y la captura automática de páginas vistas están desactivadas.",
+      notCollected: "Nunca se recopila: mensajes de chat, rutas de archivos, claves de API, configuración del modelo, credenciales de cuenta.",
+    },
   },
   theme: {
     label: "Tema",
