@@ -23,13 +23,15 @@ export default {
     "Henüz anı yok. Hermes sohbet ederken önemli bilgileri kaydedecek.",
   noMemoryEntries: "Henüz bellek girdisi yok.",
   noToolsetsFound: "Araç seti bulunamadı.",
-  addManuallyHint: "Yukarıdaki butonu kullanarak belleğe manuel olarak da ekleme yapabilirsiniz.",
+  addManuallyHint:
+    "Yukarıdaki butonu kullanarak belleğe manuel olarak da ekleme yapabilirsiniz.",
   userProfileHint:
     "Hermes'e kendinizden bahsedin — ad, rol, tercihler, iletişim tarzı.",
   providersHint:
     "Takılabilir bellek sağlayıcıları, Hermes'e gelişmiş uzun süreli bellek verir. Yerleşik bellek (yukarıda) seçilen sağlayıcının yanında her zaman aktiftir.",
   providersHintActive: "Aktif: <strong>{{provider}}</strong>",
-  providersHintInactive: "Harici sağlayıcı aktif değil — yalnızca yerleşik bellek kullanılıyor.",
+  providersHintInactive:
+    "Harici sağlayıcı aktif değil — yalnızca yerleşik bellek kullanılıyor.",
   enterEnvKey: "{{key}} girin",
   chars: "{{count}} karakter",
   cancel: "İptal",
@@ -46,16 +48,14 @@ export default {
   providers: {
     honcho:
       "Yapay zeka odaklı oturumlar arası kullanıcı modelleme, diyalektik soru-cevap ve anlamsal arama",
-    hindsight:
-      "Bilgi grafiği ve çoklu strateji getirme ile uzun süreli bellek",
+    hindsight: "Bilgi grafiği ve çoklu strateji getirme ile uzun süreli bellek",
     mem0: "Sunucu tarafı LLM bilgi çıkarma, anlamsal arama ve otomatik yineleme kaldırma",
     retaindb: "Hibrit arama ve 7 bellek türü ile bulut bellek API'si",
     supermemory:
       "Profil hatırlama ve varlık çıkarma ile anlamsal uzun süreli bellek",
     holographic:
       "FTS5 arama ve güven puanlaması ile yerel SQLite bilgi deposu (API anahtarı gerekmez)",
-    openviking:
-      "Katmanlı getirme ve bilgi gezinme ile oturum yönetimli bellek",
+    openviking: "Katmanlı getirme ve bilgi gezinme ile oturum yönetimli bellek",
     byterover: "brv CLI ile katmanlı getirme ve kalıcı bilgi ağacı",
   },
 } as const;

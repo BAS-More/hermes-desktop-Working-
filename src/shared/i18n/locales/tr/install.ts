@@ -19,14 +19,15 @@ export default {
   confirmUpdate:
     "Burada mevcut bir Hermes kurulumu var — en son sürüme güncellenecek.",
   confirmReplace:
-    "Burada bir klasör var ancak geçerli bir Hermes kurulumu değil — kurulum silip değiştirecek.",
+    "Burada bir klasör var ancak geçerli bir Hermes kurulumu değil — kurulum bu klasörü silip yenisiyle değiştirecektir.",
   confirmNotInherited:
     "Hermes'i başka bir yere veya komut satırından kurduysanız, buraya taşınmayacaktır.",
   confirmInstallBtn: "Hermes'i Kur",
   useExistingBtn: "Mevcut bir kurulumu kullan",
   useExistingHint:
     "Mevcut Hermes kurulumunuzu içeren klasörü seçin (hermes-agent klasörünü içeren).",
-  useExistingInvalid: "Bu klasörde kullanılabilir bir Hermes kurulumu bulunamadı.",
+  useExistingInvalid:
+    "Bu klasörde kullanılabilir bir Hermes kurulumu bulunamadı.",
   useExistingDone:
     "Mevcut kurulum ayarlandı — uygulamak için Hermes'i kapatıp yeniden açın.",
   useExistingQuitBtn: "Hermes'ten Çık",

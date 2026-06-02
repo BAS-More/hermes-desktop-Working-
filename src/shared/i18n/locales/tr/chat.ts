@@ -5,13 +5,13 @@ export default {
   auto: "Otomatik",
   commandsTitle: "Komutlar",
   typeMessage: "Bir mesaj yaz... (Shift+Enter yeni satır)",
-  quickAskTitle:
-    "Hızlı Sor (/btw) — sohbet bağlamını etkilemeyen yan soru",
+  quickAskTitle: "Hızlı Sor (/btw) — sohbet bağlamını etkilemeyen yan soru",
   send: "Gönder",
   custom: "Özel",
   typeModelName: "Model adını yaz...",
   emptyTitle: "Bugün size nasıl yardımcı olabilirim?",
-  emptyHint: "Benden kod yazmamı, soruları yanıtlamamı, internette arama yapmamı ve daha fazlasını isteyin",
+  emptyHint:
+    "Benden kod yazmamı, soruları yanıtlamamı, internette arama yapmamı ve daha fazlasını isteyin",
   suggestionSearch: "İnternette ara",
   suggestionReminder: "Hatırlatıcı ayarla",
   suggestionEmail: "E-postaları özetle",
@@ -20,7 +20,7 @@ export default {
   suggestionAnalyze: "Veri analizi yap",
   approve: "Onayla",
   deny: "Reddet",
-  thinking: "Düşünüyor",
+  thinking: "Düşünüyor…",
   thought: "Düşünce",
   toolCall: "Araç çağrısı",
   toolResult: "Araç sonucu",
@@ -47,7 +47,8 @@ export default {
   attachRemoteModeBinary:
     "{{name}}: PDF/ikili dosya ekleri yerel mod gerektirir — görseller ve metin dosyaları çalışır.",
   validation: {
-    noModel: "Hiçbir model seçilmedi. Aşağıdaki Sohbet seçicisinden bir model seçin.",
+    noModel:
+      "Hiçbir model seçilmedi. Aşağıdaki Sohbet seçicisinden bir model seçin.",
     noProvider: "Aktif model için sağlayıcı ayarlanmamış.",
     missingKey: "{{key}} eksik — aktif sağlayıcı tarafından gerekli.",
     fixInProviders: "Sağlayıcılar → bölümünde ayarlayın",

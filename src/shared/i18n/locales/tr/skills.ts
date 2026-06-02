@@ -1,6 +1,7 @@
 export default {
   title: "Yetenekler",
-  subtitle: "Ajantı tekrar kullanılabilir yetenekler ve iş akışlarıyla genişletin",
+  subtitle:
+    "Ajanı tekrar kullanılabilir yetenekler ve iş akışlarıyla genişletin",
   refresh: "Yenile",
   installedTab: "Yüklü",
   browseTab: "Gözat",
@@ -10,7 +11,7 @@ export default {
   noMatchingInstalled: "Eşleşen yetenek bulunamadı",
   noInstalled: "Henüz yetenek yüklenmemiş",
   noInstalledHint:
-    "Mevcut yeteneklere gözatın ve ajantı genişletmek için yükleyin",
+    "Mevcut yeteneklere gözatın ve ajanı genişletmek için yükleyin",
   noMatchingHint: "Farklı bir arama terimi deneyin",
   noBrowseResults: "Yetenek bulunamadı",
   noBrowseResultsHint: "Farklı bir arama terimi veya kategori filtresi deneyin",

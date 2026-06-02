@@ -1,7 +1,7 @@
 export default {
   title: "Persona",
   subtitle:
-    "SOUL.md aracılığıyla ajantın kişiliğini, tonunu ve talimatlarını tanımlayın",
+    "SOUL.md aracılığıyla ajanın kişiliğini, tonunu ve talimatlarını tanımlayın",
   resetTitle: "Varsayılana sıfırla",
   reset: "Sıfırla",
   resetConfirm:

@@ -29,10 +29,13 @@ export default {
   remoteGroupLabel: "Uzaktaki OpenAI Uyumlu API'ler",
   serverUrl: "Temel URL",
   modelName: "Model Adı",
-  localServerHint: "Devam etmeden önce yerel sunucunuzun çalıştığından emin olun",
-  customServerHint: "Bir ön ayar seçin veya herhangi bir OpenAI uyumlu temel URL yapıştırın",
+  localServerHint:
+    "Devam etmeden önce yerel sunucunuzun çalıştığından emin olun",
+  customServerHint:
+    "Bir ön ayar seçin veya herhangi bir OpenAI uyumlu temel URL yapıştırın",
   customApiKeyLabel: "API Anahtarı",
-  customApiKeyHint: "Uzaktaki API'ler için gerekli. Localhost için boş bırakın.",
+  customApiKeyHint:
+    "Uzaktaki API'ler için gerekli. Localhost için boş bırakın.",
   defaultModelHint: "Sunucunun varsayılan modelini kullanmak için boş bırakın",
   missingApiKey: "Lütfen bir API anahtarı girin",
   missingServerUrl: "Lütfen sunucu URL'sini girin",

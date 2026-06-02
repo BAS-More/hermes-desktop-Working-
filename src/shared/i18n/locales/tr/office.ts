@@ -21,7 +21,7 @@ export default {
   close: "Kapat",
   cannotLoadClaw3d: "Claw3D yüklenemiyor",
   startingClaw3dService: "Claw3D servisi başlatılıyor...",
-  clickToStart: "Claw3D'yi çalıştırmak için \"Başlat\"a tıklayın",
+  clickToStart: 'Claw3D\'yi çalıştırmak için "Başlat"a tıklayın',
   setupDesc1:
     "Claw3D, Hermes ajanlarınız için 3B görselleştirme ortamıdır. Ajanlarınızı interaktif bir ofis alanında çalışırken görmenizi sağlar.",
   setupDesc2:

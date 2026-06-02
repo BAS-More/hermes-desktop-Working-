@@ -53,10 +53,12 @@ export default {
   httpProxyHint:
     "Tüm giden bağlantılar için SOCKS veya HTTP vekil sunucu (otomatik algılama için boş bırakın)",
   saved: "Kaydedildi",
-  providerHint: "Bir çıkarım sağlayıcısı seçin veya API Anahtarına göre otomatik algıla",
+  providerHint:
+    "Bir çıkarım sağlayıcısı seçin veya API Anahtarına göre otomatik algıla",
   customProviderHint:
     "Herhangi bir OpenAI uyumlu API kullanın (LM Studio, Ollama, vLLM, vb.)",
-  modelHint: "Varsayılan model adı (sağlayıcı varsayılanını kullanmak için boş bırakın)",
+  modelHint:
+    "Varsayılan model adı (sağlayıcı varsayılanını kullanmak için boş bırakın)",
   refreshModels: "Model listesini yenile",
   discoveringModels: "Kullanılabilir modeller yükleniyor…",
   discoveredCount: "{{count}} model mevcut — filtrelemek için yazmaya başlayın",
@@ -102,7 +104,8 @@ export default {
   modeLocal: "Yerel",
   modeRemote: "Uzak",
   modeLocalHint: "Bu cihazda yüklü Hermes kullanılıyor",
-  modeRemoteHint: "Ağınızdaki veya buluttaki bir Hermes API sunucusuna bağlanın",
+  modeRemoteHint:
+    "Ağınızdaki veya buluttaki bir Hermes API sunucusuna bağlanın",
   remoteUrl: "Uzak URL",
   remoteUrlHint:
     "Hermes API sunucusu URL'si (/health ve /v1/chat/completions uç noktalarını sunmalıdır)",

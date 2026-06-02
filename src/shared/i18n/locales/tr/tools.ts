@@ -1,7 +1,7 @@
 export default {
   title: "Araçlar",
   subtitle:
-    "Ajantın konuşmalar sırasında kullanabileceği araç setlerini etkinleştirin veya devre dışı bırakın",
+    "Ajanın konuşmalar sırasında kullanabileceği araç setlerini etkinleştirin veya devre dışı bırakın",
   web: {
     label: "Web Arama",
     description: "İnternette arama yapın ve URL'lerden içerik çıkarın",
@@ -22,7 +22,10 @@ export default {
     label: "Kod Çalıştırma",
     description: "Python ve kabuk kodunu doğrudan çalıştırın",
   },
-  vision: { label: "Görüntü", description: "Görselleri ve görsel içeriği analiz edin" },
+  vision: {
+    label: "Görüntü",
+    description: "Görselleri ve görsel içeriği analiz edin",
+  },
   image_gen: {
     label: "Görsel Oluşturma",
     description: "DALL-E ve diğer modellerle görsel oluşturun",
@@ -30,7 +33,8 @@ export default {
   tts: { label: "Metin-Ses", description: "Metni konuşmaya dönüştürün" },
   skills: {
     label: "Yetenekler",
-    description: "Tekrar kullanılabilir yetenekler oluşturun, yönetin ve çalıştırın",
+    description:
+      "Tekrar kullanılabilir yetenekler oluşturun, yönetin ve çalıştırın",
   },
   memory: {
     label: "Bellek",
@@ -58,7 +62,8 @@ export default {
   },
   todo: {
     label: "Görev Planlama",
-    description: "Karmaşık görevler için yapılacaklar listesi oluşturun ve yönetin",
+    description:
+      "Karmaşık görevler için yapılacaklar listesi oluşturun ve yönetin",
   },
   mcpServers: "MCP Sunucuları",
   mcpDescription:

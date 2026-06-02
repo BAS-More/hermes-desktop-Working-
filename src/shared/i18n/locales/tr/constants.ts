@@ -61,7 +61,8 @@ export default {
   minimaxApiKey: "MiniMax API Anahtarı",
   minimaxHint: "MiniMax modelleri (global)",
   nousApiKey: "Nous Portal API Anahtarı",
-  nousHint: "Nous Portal API anahtarı — Nous aboneliğiniz varsa aşağıdaki OAuth kartını kullanın",
+  nousHint:
+    "Nous Portal API anahtarı — Nous aboneliğiniz varsa aşağıdaki OAuth kartını kullanın",
   minimaxCnApiKey: "MiniMax Çin API Anahtarı",
   minimaxCnHint: "MiniMax modelleri (Çin uç noktası)",
   opencodeZenApiKey: "OpenCode Zen API Anahtarı",
