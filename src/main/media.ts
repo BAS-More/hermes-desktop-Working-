@@ -43,6 +43,7 @@ const EXT_BY_MIME: Record<string, string> = Object.fromEntries(
 
 function sanitizeFilename(name: string): string {
   const cleaned = (name || "image")
+    // eslint-disable-next-line no-control-regex -- intentionally strip control chars from filenames
     .replace(/[\x00-\x1F<>:"/\\|?*]/g, "")
     .replace(/\s+/g, "_")
     .replace(/\.{2,}/g, ".")

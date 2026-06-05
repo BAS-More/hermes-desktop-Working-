@@ -166,9 +166,10 @@ vi.mock("better-sqlite3", () => {
           .toLowerCase();
         const limit = Number(args[2]);
         return Array.from(this.store.sessions.values())
-          .filter((session) =>
-            (session.title || "").toLowerCase().includes(titlePattern) ||
-            session.id.toLowerCase().includes(idPattern),
+          .filter(
+            (session) =>
+              (session.title || "").toLowerCase().includes(titlePattern) ||
+              session.id.toLowerCase().includes(idPattern),
           )
           .sort((a, b) => b.started_at - a.started_at)
           .slice(0, limit)
@@ -204,7 +205,7 @@ vi.mock("better-sqlite3", () => {
       throw new Error(`Unhandled fake all SQL: ${this.sql}`);
     }
 
-    get(..._args: unknown[]): unknown {
+    get(): unknown {
       if (this.sql.includes("FROM sqlite_master")) {
         return undefined;
       }
