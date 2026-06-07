@@ -136,8 +136,9 @@ const hermesAPI = {
     ipcRenderer.invoke("anthropic-oauth-start"),
   anthropicOauthSubmit: (
     code: string,
+    profile?: string,
   ): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke("anthropic-oauth-submit", code),
+    ipcRenderer.invoke("anthropic-oauth-submit", code, profile),
 
   getLocale: (): Promise<AppLocale> => ipcRenderer.invoke("get-locale"),
   setLocale: (locale: AppLocale): Promise<AppLocale> =>

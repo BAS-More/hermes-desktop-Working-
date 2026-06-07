@@ -585,8 +585,15 @@ function setupIPC(): void {
     pendingAnthropic = { verifier: r.verifier, state: r.state };
     return { url: r.url };
   });
-  ipcMain.handle("anthropic-oauth-submit", (_event, code: string) =>
-    exchangeAnthropicCode(code, pendingAnthropic.verifier, pendingAnthropic.state),
+  ipcMain.handle(
+    "anthropic-oauth-submit",
+    (_event, code: string, profile?: string) =>
+      exchangeAnthropicCode(
+        code,
+        pendingAnthropic.verifier,
+        pendingAnthropic.state,
+        profile,
+      ),
   );
 
   // Configuration (profile-aware)

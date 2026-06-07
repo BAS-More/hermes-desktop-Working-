@@ -111,7 +111,7 @@ function OAuthLoginModal({
     if (!code.trim() || submitting) return;
     setSubmitting(true);
     window.hermesAPI
-      .anthropicOauthSubmit(code.trim())
+      .anthropicOauthSubmit(code.trim(), profile)
       .then((res) => {
         if (res.success) {
           setStatus("success");
