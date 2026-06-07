@@ -222,6 +222,7 @@ interface HermesAPI {
   anthropicOauthStart: () => Promise<{ url: string }>;
   anthropicOauthSubmit: (
     code: string,
+    profile?: string,
   ) => Promise<{ success: boolean; error?: string }>;
 
   getLocale: () => Promise<AppLocale>;

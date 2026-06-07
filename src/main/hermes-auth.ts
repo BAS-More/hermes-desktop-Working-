@@ -9,7 +9,7 @@ import {
   getEnhancedPath,
 } from "./installer";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
-import { stripAnsi } from "./utils";
+import { profileHome, stripAnsi } from "./utils";
 
 /**
  * Provider identifiers that authenticate via an interactive OAuth flow
@@ -303,7 +303,17 @@ function persistAnthropicToken(
   accessToken: string,
   refreshToken: string,
   expiresInSeconds: number,
+  profile?: string,
 ): Promise<{ ok: boolean; output: string }> {
+  // The hermes-agent engine resolves its data home purely from the
+  // HERMES_HOME env var (see hermes_constants.get_hermes_home — it reads
+  // os.environ["HERMES_HOME"] and has no HERMES_PROFILE support). So to
+  // make load_pool() write into the SELECTED profile's credential pool
+  // rather than the default one, we point HERMES_HOME at that profile's
+  // home (<HERMES_HOME>/profiles/<name>) for non-default profiles. The
+  // default profile keeps the unmodified HERMES_HOME to avoid regressions.
+  const persistHome =
+    profile && profile !== "default" ? profileHome(profile) : HERMES_HOME;
   return new Promise((resolve) => {
     execFile(
       HERMES_PYTHON,
@@ -320,7 +330,7 @@ function persistAnthropicToken(
           ...process.env,
           PATH: getEnhancedPath(),
           HOME: homedir(),
-          HERMES_HOME,
+          HERMES_HOME: persistHome,
           PYTHONUNBUFFERED: "1",
         },
         ...HIDDEN_SUBPROCESS_OPTIONS,
@@ -350,6 +360,7 @@ export async function exchangeAnthropicCode(
   pasted: string,
   verifier: string,
   state: string,
+  profile?: string,
 ): Promise<OAuthLoginResult & { persisted?: boolean }> {
   const trimmed = (pasted || "").trim();
   if (!trimmed) {
@@ -401,6 +412,7 @@ export async function exchangeAnthropicCode(
     accessToken,
     refreshToken,
     expiresIn,
+    profile,
   );
   if (persisted.ok) {
     return { success: true, persisted: true };
