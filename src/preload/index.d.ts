@@ -218,6 +218,12 @@ interface HermesAPI {
   cancelOAuthLogin: () => Promise<boolean>;
   onOAuthLoginProgress: (callback: (chunk: string) => void) => () => void;
 
+  // Anthropic Claude (OAuth) — native paste-a-code PKCE flow
+  anthropicOauthStart: () => Promise<{ url: string }>;
+  anthropicOauthSubmit: (
+    code: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+
   getLocale: () => Promise<AppLocale>;
   setLocale: (locale: AppLocale) => Promise<AppLocale>;
 

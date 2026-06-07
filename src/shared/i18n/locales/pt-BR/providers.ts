@@ -15,5 +15,7 @@ export default {
     qwenDesc: "Use sua assinatura do Qwen",
     geminiDesc: "Use seu plano Google AI Pro / Gemini",
     minimaxDesc: "Use sua assinatura do MiniMax",
+    anthropicDesc:
+      "Sign in with your Claude Pro/Max subscription. Authorize in the browser, then paste the code shown.",
   },
 } as const;
