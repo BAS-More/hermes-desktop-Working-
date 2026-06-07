@@ -131,6 +131,14 @@ const hermesAPI = {
     return () => ipcRenderer.removeListener("oauth-login-progress", handler);
   },
 
+  // Anthropic Claude (OAuth) — native paste-a-code PKCE flow
+  anthropicOauthStart: (): Promise<{ url: string }> =>
+    ipcRenderer.invoke("anthropic-oauth-start"),
+  anthropicOauthSubmit: (
+    code: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("anthropic-oauth-submit", code),
+
   getLocale: (): Promise<AppLocale> => ipcRenderer.invoke("get-locale"),
   setLocale: (locale: AppLocale): Promise<AppLocale> =>
     ipcRenderer.invoke("set-locale", locale),

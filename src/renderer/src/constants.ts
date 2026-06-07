@@ -232,6 +232,11 @@ export const OAUTH_PROVIDERS: OAuthProviderDef[] = [
     desc: "providers.oauth.codexDesc",
   },
   {
+    id: "anthropic",
+    name: "Anthropic Claude (OAuth)",
+    desc: "providers.oauth.anthropicDesc",
+  },
+  {
     id: "xai-oauth",
     name: "xAI Grok (OAuth)",
     desc: "providers.oauth.xaiDesc",

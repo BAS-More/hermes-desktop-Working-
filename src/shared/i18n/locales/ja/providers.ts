@@ -14,5 +14,7 @@ export default {
     qwenDesc: "Qwen のサブスクリプションを使用",
     geminiDesc: "Google AI Pro / Gemini プランを使用",
     minimaxDesc: "MiniMax のサブスクリプションを使用",
+    anthropicDesc:
+      "Sign in with your Claude Pro/Max subscription. Authorize in the browser, then paste the code shown.",
   },
 } as const;

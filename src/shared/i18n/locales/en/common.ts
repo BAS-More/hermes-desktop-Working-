@@ -18,6 +18,7 @@ export default {
   close: "Close",
   dismiss: "Dismiss",
   confirm: "Confirm",
+  submit: "Submit",
   reset: "Reset",
   back: "Back",
   open: "Open",

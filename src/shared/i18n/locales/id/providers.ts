@@ -15,5 +15,7 @@ export default {
     qwenDesc: "Gunakan langganan Qwen Anda",
     geminiDesc: "Gunakan paket Google AI Pro / Gemini Anda",
     minimaxDesc: "Gunakan langganan MiniMax Anda",
+    anthropicDesc:
+      "Sign in with your Claude Pro/Max subscription. Authorize in the browser, then paste the code shown.",
   },
 } as const;

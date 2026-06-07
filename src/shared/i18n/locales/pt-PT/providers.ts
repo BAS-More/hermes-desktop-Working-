@@ -17,5 +17,7 @@ export default {
     geminiDesc: "Use o seu plano Google AI Pro / Gemini",
     minimaxDesc: "Use a sua subscrição do MiniMax",
     nousDesc: "Inicie sessão com a sua subscrição do Nous Portal",
+    anthropicDesc:
+      "Sign in with your Claude Pro/Max subscription. Authorize in the browser, then paste the code shown.",
   },
 } as const;

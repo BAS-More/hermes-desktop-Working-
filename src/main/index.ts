@@ -61,6 +61,8 @@ import {
   runHermesAuthLogin,
   cancelHermesAuthLogin,
   detectDeviceCode,
+  buildAnthropicAuthUrl,
+  exchangeAnthropicCode,
 } from "./hermes-auth";
 import {
   isRemoteMode,
@@ -567,6 +569,25 @@ function setupIPC(): void {
     );
   });
   ipcMain.handle("oauth-login-cancel", () => cancelHermesAuthLogin());
+
+  // Anthropic Claude (OAuth) — native paste-a-code PKCE flow. The CLI
+  // can't drive this here (it refuses our closed/non-tty stdin), so the
+  // main process runs the PKCE dance itself. `anthropic-oauth-start`
+  // mints a fresh verifier/state pair (single-flight) and returns the
+  // authorize URL; `anthropic-oauth-submit` exchanges the pasted code
+  // and persists the token into the credential pool.
+  let pendingAnthropic: { verifier: string; state: string } = {
+    verifier: "",
+    state: "",
+  };
+  ipcMain.handle("anthropic-oauth-start", () => {
+    const r = buildAnthropicAuthUrl();
+    pendingAnthropic = { verifier: r.verifier, state: r.state };
+    return { url: r.url };
+  });
+  ipcMain.handle("anthropic-oauth-submit", (_event, code: string) =>
+    exchangeAnthropicCode(code, pendingAnthropic.verifier, pendingAnthropic.state),
+  );
 
   // Configuration (profile-aware)
   ipcMain.handle("get-locale", () => getAppLocale());

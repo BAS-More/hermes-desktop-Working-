@@ -13,5 +13,7 @@ export default {
     qwenDesc: "使用您的 Qwen 訂閱",
     geminiDesc: "使用您的 Google AI Pro / Gemini 方案",
     minimaxDesc: "使用您的 MiniMax 訂閱",
+    anthropicDesc:
+      "Sign in with your Claude Pro/Max subscription. Authorize in the browser, then paste the code shown.",
   },
 } as const;
