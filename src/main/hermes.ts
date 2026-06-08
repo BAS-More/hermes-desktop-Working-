@@ -26,6 +26,7 @@ import {
 import {
   getApiServerKey,
   getConnectionConfig,
+  getConfigValue,
   getModelConfig,
   readEnv,
 } from "./config";
@@ -454,7 +455,9 @@ class TuiGatewayClient {
     return () => this.handlers.delete(handler);
   }
 
-  findRecentEvent(predicate: (event: GatewayEvent) => boolean): GatewayEvent | null {
+  findRecentEvent(
+    predicate: (event: GatewayEvent) => boolean,
+  ): GatewayEvent | null {
     for (let i = this.recentEvents.length - 1; i >= 0; i--) {
       const event = this.recentEvents[i];
       if (predicate(event)) return event;
@@ -715,7 +718,9 @@ function waitForGatewayEvent(
   });
 }
 
-function wsDataToString(data: string | Buffer | ArrayBuffer | Buffer[]): string {
+function wsDataToString(
+  data: string | Buffer | ArrayBuffer | Buffer[],
+): string {
   if (typeof data === "string") return data;
   if (Buffer.isBuffer(data)) return data.toString("utf-8");
   if (Array.isArray(data)) return Buffer.concat(data).toString("utf-8");
@@ -1014,6 +1019,22 @@ export function contextFolderSystemMessage(
   };
 }
 
+function reasoningEffortForProfile(
+  profile?: string,
+): "minimal" | "low" | "medium" | "high" | "xhigh" | null {
+  const value = (getConfigValue("agent.reasoning_effort", profile) || "")
+    .trim()
+    .toLowerCase();
+
+  return value === "minimal" ||
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "xhigh"
+    ? value
+    : null;
+}
+
 function sendMessageViaApi(
   message: string,
   cb: ChatCallbacks,
@@ -1049,12 +1070,15 @@ function sendMessageViaApi(
   const ctxSystem = contextFolderSystemMessage(contextFolder);
   if (ctxSystem) messages.unshift(ctxSystem);
 
-  const body = JSON.stringify({
+  const reasoningEffort = reasoningEffortForProfile(profile);
+  const bodyObj: Record<string, unknown> = {
     model: mc.model || "hermes-agent",
     messages,
     stream: true,
     ...(_resumeSessionId ? { session_id: _resumeSessionId } : {}),
-  });
+  };
+  if (reasoningEffort) bodyObj.reasoning_effort = reasoningEffort;
+  const body = JSON.stringify(bodyObj);
 
   // Encode the body up-front into a Buffer so we can:
   //  1. Set `Content-Length` accurately based on byte length (NOT char
@@ -1125,11 +1149,13 @@ function sendMessageViaApi(
 
   function probeRealError(): void {
     // When streaming returns empty, make a non-streaming request to surface the real error
-    const probeBody = JSON.stringify({
+    const probeBodyObj: Record<string, unknown> = {
       model: mc.model || "hermes-agent",
       messages: [{ role: "user", content: userContent }],
       stream: false,
-    });
+    };
+    if (reasoningEffort) probeBodyObj.reasoning_effort = reasoningEffort;
+    const probeBody = JSON.stringify(probeBodyObj);
     const probeBodyBuf = Buffer.from(probeBody, "utf-8");
     // Per-request Content-Length (the outer `headers` object's value
     // belongs to the streaming request — reusing it here would lie about
@@ -1424,6 +1450,8 @@ function sendMessageViaRuns(
     input: message,
     conversation_history: apiHistory(history),
   };
+  const reasoningEffort = reasoningEffortForProfile(profile);
+  if (reasoningEffort) bodyObj.reasoning_effort = reasoningEffort;
   if (sessionId) bodyObj.session_id = sessionId;
   if (ctxSystem) bodyObj.instructions = ctxSystem.content;
   const bodyBuf = Buffer.from(JSON.stringify(bodyObj), "utf-8");
@@ -1962,6 +1990,7 @@ function sendMessageViaCli(
   const KNOWN_API_KEYS = [
     "OPENROUTER_API_KEY",
     "OPENAI_API_KEY",
+    "OLLAMA_API_KEY",
     "ANTHROPIC_API_KEY",
     "GROQ_API_KEY",
     "DEEPSEEK_API_KEY",
@@ -2193,7 +2222,10 @@ function sendMessageViaCli(
 
 let apiServerAvailable: boolean | null = null; // cached after first check
 
-function setApiCacheFor(profile: string | undefined, value: boolean | null): void {
+function setApiCacheFor(
+  profile: string | undefined,
+  value: boolean | null,
+): void {
   if (profileKey(profile) === profileKey(undefined)) {
     apiServerAvailable = value;
   }
@@ -3160,18 +3192,8 @@ export function restartGatewayViaCli(
   }
 
   const queued = gatewayRestartQueueTail.then(
-    () =>
-      restartGatewayViaCliOnce(
-        profile,
-        healthTimeoutMs,
-        healthPollMs,
-      ),
-    () =>
-      restartGatewayViaCliOnce(
-        profile,
-        healthTimeoutMs,
-        healthPollMs,
-      ),
+    () => restartGatewayViaCliOnce(profile, healthTimeoutMs, healthPollMs),
+    () => restartGatewayViaCliOnce(profile, healthTimeoutMs, healthPollMs),
   );
 
   const promise = queued.finally(() => {
@@ -3275,7 +3297,10 @@ async function restartGatewayViaCliOnce(
       };
 
       proc.on("error", (err) => {
-        console.error(`[gateway:${key}] Failed to restart gateway:`, err.message);
+        console.error(
+          `[gateway:${key}] Failed to restart gateway:`,
+          err.message,
+        );
         finish(false);
       });
 
