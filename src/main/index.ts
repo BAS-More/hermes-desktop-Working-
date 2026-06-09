@@ -128,6 +128,11 @@ import {
   getApiServerKey,
 } from "./config";
 import {
+  getAuxiliaryConfig,
+  setAuxiliaryTask,
+  resetAuxiliaryToAuto,
+} from "./auxiliary-config";
+import {
   listSessions,
   getSessionMessages,
   searchSessions,
@@ -169,6 +174,7 @@ import {
 } from "./tools";
 import {
   fetchRegistry,
+  fetchModelRegistry,
   fetchRegistryDetail,
   listInstalledRegistry,
   installRegistryItem,
@@ -728,6 +734,56 @@ function setupIPC(): void {
       return true;
     },
   );
+
+  // Auxiliary (side-task) model routing
+  ipcMain.handle("get-auxiliary-config", (_event, profile?: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) {
+      // TODO: SSH path for auxiliary config (requires sshGetAuxiliaryConfig)
+      return [];
+    }
+    return getAuxiliaryConfig(profile);
+  });
+
+  ipcMain.handle(
+    "set-auxiliary-task",
+    async (
+      _event,
+      task: string,
+      cfg: { provider: string; model: string; baseUrl: string },
+      profile?: string,
+    ) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh) {
+        // TODO: SSH path for auxiliary config (requires sshSetAuxiliaryTask)
+        return false;
+      }
+      setAuxiliaryTask(task, cfg, profile);
+
+      // Restart gateway so it picks up the new auxiliary config
+      if (isGatewayRunning(profile)) {
+        restartGateway(profile);
+      }
+
+      return true;
+    },
+  );
+
+  ipcMain.handle("reset-auxiliary-config", async (_event, profile?: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) {
+      // TODO: SSH path for auxiliary config (requires sshResetAuxiliaryConfig)
+      return false;
+    }
+    resetAuxiliaryToAuto(profile);
+
+    // Restart gateway so it picks up the reset
+    if (isGatewayRunning(profile)) {
+      restartGateway(profile);
+    }
+
+    return true;
+  });
 
   // API_SERVER_KEY management — lets the renderer detect a missing key and
   // generate one with a button click (local mode) or show instructions (remote/SSH).
@@ -1964,6 +2020,9 @@ function setupIPC(): void {
   // Discover marketplace (community registry)
   ipcMain.handle("registry-fetch", (_event, force?: boolean) =>
     fetchRegistry(!!force),
+  );
+  ipcMain.handle("registry-fetch-models", (_event, force?: boolean) =>
+    fetchModelRegistry(!!force),
   );
   ipcMain.handle("registry-list-installed", (_event, profile?: string) =>
     listInstalledRegistry(profile),

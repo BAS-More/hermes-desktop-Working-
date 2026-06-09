@@ -6947,6 +6947,9 @@ body {
 }
 
 .discover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-shrink: 0;
 }
 
@@ -8792,6 +8795,200 @@ body {
   margin-bottom: 20px;
 }
 
+.models-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.models-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 4px 4px 0 0;
+}
+
+.models-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.models-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.aux-task-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.aux-task-provider {
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.aux-task-model {
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.models-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.models-provider-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.models-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.models-provider-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.models-provider-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.models-provider-chip-count {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.models-provider-chip:not(.active) .models-provider-chip-count {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.models-registry-modal {
+  width: 70vw !important;
+  max-width: none;
+}
+
+.models-registry-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.registry-model-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.registry-provider {
+  margin-bottom: 18px;
+}
+
+.registry-provider-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.registry-provider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.registry-provider-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.registry-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.registry-model-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.registry-model-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.registry-model-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.registry-model-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.registry-model-added {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--success);
+  white-space: nowrap;
+}
+
 .models-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
@@ -8831,6 +9028,12 @@ body {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+}
+
+.models-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .models-modal-title {

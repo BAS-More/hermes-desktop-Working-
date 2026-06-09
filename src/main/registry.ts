@@ -11,6 +11,7 @@ import type {
   InstalledRegistry,
   RegistryDetail,
   RegistryDetailRow,
+  ModelRegistry,
 } from "../shared/registry";
 
 export type {
@@ -32,6 +33,7 @@ const REGISTRY_BRANCH = "main";
 const REGISTRY_RAW_BASE = `https://raw.githubusercontent.com/${REGISTRY_REPO}/refs/heads/${REGISTRY_BRANCH}`;
 const REGISTRY_REPO_BASE = `https://github.com/${REGISTRY_REPO}/tree/${REGISTRY_BRANCH}`;
 const INDEX_URL = `${REGISTRY_RAW_BASE}/index.json`;
+const MODELS_URL = `${REGISTRY_RAW_BASE}/models.json`;
 const TREE_URL = `https://api.github.com/repos/${REGISTRY_REPO}/git/trees/${REGISTRY_BRANCH}?recursive=1`;
 
 /** index.json entry shape. */
@@ -143,6 +145,45 @@ export async function fetchRegistry(
     return {
       ...EMPTY_CATALOG,
       error: err instanceof Error ? err.message : "Failed to load registry",
+    };
+  }
+}
+
+// Short-lived cache for the model catalog (models.json).
+let modelCache: { at: number; data: ModelRegistry } | null = null;
+
+/**
+ * Fetch the curated model catalog (models.json) from the registry. Network /
+ * parse failures resolve to an empty provider list (with `error` set) so the
+ * Models screen can render a graceful empty state.
+ */
+export async function fetchModelRegistry(
+  force = false,
+): Promise<ModelRegistry> {
+  if (!force && modelCache && Date.now() - modelCache.at < CACHE_TTL_MS) {
+    return modelCache.data;
+  }
+  try {
+    const res = await fetch(MODELS_URL, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      return { providers: [], error: `Registry returned ${res.status}` };
+    }
+    const raw = (await res.json()) as ModelRegistry;
+    const data: ModelRegistry = {
+      schemaVersion: raw.schemaVersion,
+      generated: raw.generated,
+      providerCount: raw.providerCount,
+      modelCount: raw.modelCount,
+      providers: Array.isArray(raw.providers) ? raw.providers : [],
+    };
+    modelCache = { at: Date.now(), data };
+    return data;
+  } catch (err) {
+    return {
+      providers: [],
+      error: err instanceof Error ? err.message : "Failed to load models",
     };
   }
 }

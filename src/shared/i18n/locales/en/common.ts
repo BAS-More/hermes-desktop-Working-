@@ -7,6 +7,7 @@ export default {
   loadingShort: "Loading",
   saved: "Saved",
   save: "Save",
+  edit: "Edit",
   search: "Search",
   searchPlaceholder: "Search...",
   show: "Show",

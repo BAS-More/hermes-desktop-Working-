@@ -5,6 +5,7 @@ import type {
   RegistryItem,
   RegistryCatalog,
   RegistryDetail,
+  ModelRegistry,
 } from "../shared/registry";
 import type {
   MessagingPlatformsResponse,
@@ -252,6 +253,17 @@ interface HermesAPI {
   getModelConfig: (
     profile?: string,
   ) => Promise<{ provider: string; model: string; baseUrl: string }>;
+  getAuxiliaryConfig: (
+    profile?: string,
+  ) => Promise<
+    { task: string; provider: string; model: string; baseUrl: string }[]
+  >;
+  setAuxiliaryTask: (
+    task: string,
+    cfg: { provider: string; model: string; baseUrl: string },
+    profile?: string,
+  ) => Promise<boolean>;
+  resetAuxiliaryConfig: (profile?: string) => Promise<boolean>;
   setModelConfig: (
     provider: string,
     model: string,
@@ -953,6 +965,7 @@ interface HermesAPI {
   fetchRegistry: (
     force?: boolean,
   ) => Promise<RegistryCatalog & { error?: string }>;
+  fetchModelRegistry: (force?: boolean) => Promise<ModelRegistry>;
   listInstalledRegistry: (
     profile?: string,
   ) => Promise<{ skills: string[]; mcps: string[]; workflows: string[] }>;

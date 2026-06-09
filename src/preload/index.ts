@@ -192,6 +192,23 @@ const hermesAPI = {
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-model-config", provider, model, baseUrl, profile),
 
+  // Auxiliary (side-task) model routing
+  getAuxiliaryConfig: (
+    profile?: string,
+  ): Promise<
+    { task: string; provider: string; model: string; baseUrl: string }[]
+  > => ipcRenderer.invoke("get-auxiliary-config", profile),
+
+  setAuxiliaryTask: (
+    task: string,
+    cfg: { provider: string; model: string; baseUrl: string },
+    profile?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-auxiliary-task", task, cfg, profile),
+
+  resetAuxiliaryConfig: (profile?: string): Promise<boolean> =>
+    ipcRenderer.invoke("reset-auxiliary-config", profile),
+
   // Connection mode (local / remote / ssh)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),
   isRemoteOnlyMode: (): Promise<boolean> =>
@@ -1155,6 +1172,8 @@ const hermesAPI = {
   // Discover marketplace (community registry)
   fetchRegistry: (force?: boolean) =>
     ipcRenderer.invoke("registry-fetch", force),
+  fetchModelRegistry: (force?: boolean) =>
+    ipcRenderer.invoke("registry-fetch-models", force),
   listInstalledRegistry: (profile?: string) =>
     ipcRenderer.invoke("registry-list-installed", profile),
   fetchRegistryDetail: (kind: string, item: unknown) =>
