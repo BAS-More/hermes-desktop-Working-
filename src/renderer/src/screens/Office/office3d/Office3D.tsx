@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { configureTextBuilder } from "troika-three-text";
@@ -115,24 +115,30 @@ export default function Office3D({
       onDevLog?.(msg);
     };
 
-  // Backdrop building click handler (passed down into CityBackdrop). Stable so
-  // the memoized CityBackdrop doesn't re-render on unrelated parent updates.
-  const pickBackdrop = useCallback(
-    (b: { id: string; label: string; x: number; z: number }): void => {
-      const meta: DevSel = {
-        id: b.id,
-        label: b.label,
-        kind: "backdrop",
-        base: [b.x, 0, b.z],
-        hint: "BACKDROP_OVERRIDES in CityBackdrop.tsx",
-      };
-      setDevSel(meta);
-      const msg = `🏢 SELECTED ${meta.label} (${meta.id}) — current position [${b.x.toFixed(2)}, ${b.z.toFixed(2)}]. Now click empty ground to set its new spot.`;
-      console.log(msg);
-      onDevLog?.(msg);
-    },
-    [onDevLog],
-  );
+  // Backdrop building click handler (passed down into CityBackdrop). A plain
+  // arrow (not useCallback) so production DCE can drop it entirely — its only
+  // call site is gated by `import.meta.env.DEV` and folds to `undefined` in
+  // prod. CityBackdrop is memoized, but in prod it always receives a stable
+  // `undefined` here, so referential stability only matters in dev (where the
+  // extra re-render is harmless).
+  const pickBackdrop = (b: {
+    id: string;
+    label: string;
+    x: number;
+    z: number;
+  }): void => {
+    const meta: DevSel = {
+      id: b.id,
+      label: b.label,
+      kind: "backdrop",
+      base: [b.x, 0, b.z],
+      hint: "BACKDROP_OVERRIDES in CityBackdrop.tsx",
+    };
+    setDevSel(meta);
+    const msg = `🏢 SELECTED ${meta.label} (${meta.id}) — current position [${b.x.toFixed(2)}, ${b.z.toFixed(2)}]. Now click empty ground to set its new spot.`;
+    console.log(msg);
+    onDevLog?.(msg);
+  };
 
   const dropAt = (e: ThreeEvent<MouseEvent>): void => {
     if (!devMode || !devSel) return;
