@@ -7,6 +7,12 @@ interface OAuthLoginModalProps {
   providerLabel: string;
   profile?: string;
   onClose: () => void;
+  // Fired once when an account is successfully added to the credential
+  // pool. The Providers screen uses this to reload the pool so the new
+  // account (and its badge) appears immediately, without waiting for the
+  // user to navigate away and back. Distinct from onClose, which also
+  // fires on cancel/abort.
+  onSuccess?: () => void;
 }
 
 type Status = "running" | "success" | "error";
@@ -29,6 +35,7 @@ function OAuthLoginModal({
   providerLabel,
   profile,
   onClose,
+  onSuccess,
 }: OAuthLoginModalProps): React.JSX.Element {
   const { t } = useI18n();
   const isAnthropic = provider === "anthropic";
@@ -77,6 +84,7 @@ function OAuthLoginModal({
         .then((res) => {
           if (res.success) {
             setStatus("success");
+            onSuccess?.();
           } else {
             setStatus("error");
             setError(res.error || t("providers.oauth.failed"));
@@ -88,7 +96,7 @@ function OAuthLoginModal({
         });
     }
     return cleanup;
-  }, [provider, profile, t, isAnthropic]);
+  }, [provider, profile, t, isAnthropic, onSuccess]);
 
   // Keep the streamed log scrolled to the newest line.
   useEffect(() => {
@@ -115,6 +123,7 @@ function OAuthLoginModal({
       .then((res) => {
         if (res.success) {
           setStatus("success");
+          onSuccess?.();
         } else {
           setStatus("error");
           setError(res.error || t("providers.oauth.failed"));

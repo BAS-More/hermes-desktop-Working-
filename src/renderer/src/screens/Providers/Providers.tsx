@@ -20,6 +20,11 @@ interface CredentialPoolEntry {
   api_key?: string;
   base_url?: string;
   request_count?: number;
+  // Engine status marker — "ok" (or absent) means available; "exhausted"
+  // means rate-limited/quota'd (temporary, may clear on cooldown); "dead"
+  // means permanently failed. Used to skip unavailable entries when
+  // computing which account is currently active.
+  last_status?: "ok" | "exhausted" | "dead" | string | null;
   key?: string;
 }
 
@@ -54,6 +59,12 @@ function Providers({
   const [poolProvider, setPoolProvider] = useState("");
   const [poolNewKey, setPoolNewKey] = useState("");
   const [poolNewLabel, setPoolNewLabel] = useState("");
+  // Per-provider selection strategy read from config.yaml
+  // (`credential_pool_strategies.<provider>`). Drives the read-only
+  // "active" badge below. Absent/unknown → engine default "fill_first".
+  const [poolStrategies, setPoolStrategies] = useState<
+    Record<string, string>
+  >({});
 
   // OAuth sign-in modal — holds the provider def being authenticated.
   const [oauthModal, setOauthModal] = useState<
@@ -86,6 +97,22 @@ function Providers({
     setModelName(mc.model);
     setModelBaseUrl(mc.baseUrl);
     setCredPool(pool);
+
+    // Read the per-provider selection strategy for every provider that
+    // has pool entries, so the "active" badge knows how the engine picks.
+    // `getConfig` resolves the nested YAML path; null → engine default.
+    const providersWithEntries = Object.keys(pool).filter(
+      (p) => (pool[p]?.length ?? 0) > 0,
+    );
+    const strategyPairs = await Promise.all(
+      providersWithEntries.map(async (p) => {
+        const s = await window.hermesAPI.getConfig(
+          `credential_pool_strategies.${p}`,
+        );
+        return [p, (s || "fill_first").trim().toLowerCase()] as const;
+      }),
+    );
+    setPoolStrategies(Object.fromEntries(strategyPairs));
 
     requestAnimationFrame(() => {
       modelLoaded.current = true;
@@ -241,6 +268,45 @@ function Providers({
     entries.splice(index, 1);
     await window.hermesAPI.setCredentialPool(provider, entries);
     setCredPool((prev) => ({ ...prev, [provider]: entries }));
+  }
+
+  // Compute which pool entry the engine would currently select for a
+  // provider — read-only, no engine call. Mirrors credential_pool.py:
+  //   * skip entries whose last_status is "dead" or "exhausted"
+  //     (unavailable; the engine filters these in _available_entries)
+  //   * fill_first (the default): the lowest-priority available entry
+  //   * round_robin / random / least_used: rotate or vary per request, so
+  //     no single entry is "the active one" — return null (approximate).
+  // Returns { id, approximate, strategy }. `id` is the entry.id we'd
+  // badge as active; null means we can't pin one deterministically.
+  function activePoolEntry(provider: string): {
+    id: string | null;
+    approximate: boolean;
+    strategy: string;
+  } {
+    const strategy = poolStrategies[provider] || "fill_first";
+    const entries = credPool[provider] || [];
+    const available = entries.filter((e) => {
+      const s = (e.last_status || "ok").toLowerCase();
+      return s !== "dead" && s !== "exhausted";
+    });
+    if (available.length === 0) {
+      return { id: null, approximate: false, strategy };
+    }
+    // Non-deterministic strategies: per-request rotation/variance means we
+    // can't show a single stable "active" account. Flag as approximate.
+    if (strategy !== "fill_first" && available.length > 1) {
+      return { id: null, approximate: true, strategy };
+    }
+    // fill_first (or a single available entry): lowest priority wins, ties
+    // broken by original order — matching the engine's ascending sort.
+    let best = available[0];
+    for (const e of available) {
+      const ep = typeof e.priority === "number" ? e.priority : 0;
+      const bp = typeof best.priority === "number" ? best.priority : 0;
+      if (ep < bp) best = e;
+    }
+    return { id: best.id ?? null, approximate: false, strategy };
   }
 
   function toggleVisibility(key: string): void {
@@ -459,7 +525,9 @@ function Providers({
                         )
                       : provider}
                   </div>
-                  {entries.map((entry, idx) => {
+                  {(() => {
+                    const active = activePoolEntry(provider);
+                    return entries.map((entry, idx) => {
                     // Display the secret from whichever field this
                     // entry has — new entries use `access_token` per
                     // the engine schema (#367); old entries may still
@@ -469,11 +537,56 @@ function Providers({
                       entry.api_key ||
                       entry.key ||
                       "";
+                    const isActive =
+                      active.id != null && entry.id === active.id;
+                    const status = (entry.last_status || "ok").toLowerCase();
+                    const isUnavailable =
+                      status === "dead" || status === "exhausted";
                     return (
                       <div key={entry.id || idx} className="settings-pool-entry">
                         <span className="settings-pool-label">
                           {entry.label ||
                             `${t("settings.keyLabel")} ${idx + 1}`}
+                          {isActive && (
+                            <span
+                              className="badge badge-active"
+                              title={t("settings.poolActiveHint")}
+                              style={{
+                                marginLeft: 6,
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 8,
+                                background: "var(--success, #1f9d55)",
+                                color: "#fff",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              {t("settings.poolActiveBadge")}
+                            </span>
+                          )}
+                          {isUnavailable && (
+                            <span
+                              className="badge badge-unavailable"
+                              title={
+                                status === "dead"
+                                  ? t("settings.poolDeadHint")
+                                  : t("settings.poolExhaustedHint")
+                              }
+                              style={{
+                                marginLeft: 6,
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 8,
+                                background: "var(--error, #c0392b)",
+                                color: "#fff",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              {status === "dead"
+                                ? t("settings.poolDeadBadge")
+                                : t("settings.poolExhaustedBadge")}
+                            </span>
+                          )}
                         </span>
                         <span className="settings-pool-key">
                           {secret
@@ -489,7 +602,8 @@ function Providers({
                         </button>
                       </div>
                     );
-                  })}
+                  });
+                  })()}
                 </div>
               ),
           )}
@@ -573,23 +687,63 @@ function Providers({
           {t("providers.oauth.sectionHint")}
         </div>
         <div className="provider-keys-grid">
-          {OAUTH_PROVIDERS.map((p) => (
-            <div key={p.id} className="provider-key-card">
-              <div className="provider-key-card-head">
-                <BrandLogo provider={p.id} size={22} />
-                <span className="provider-key-card-title">{p.name}</span>
+          {OAUTH_PROVIDERS.map((p) => {
+            // Each OAuth sign-in appends a new account to the provider's
+            // credential pool (the engine rotates between them and skips
+            // rate-limited ones). The pool is keyed by provider id, so the
+            // count of connected accounts is just the pool array length.
+            const accountCount = (credPool[p.id] || []).length;
+            const hasAccounts = accountCount > 0;
+            return (
+              <div key={p.id} className="provider-key-card">
+                <div className="provider-key-card-head">
+                  <BrandLogo provider={p.id} size={22} />
+                  <span className="provider-key-card-title">{p.name}</span>
+                  {hasAccounts && (
+                    <span
+                      className="badge badge-active"
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: 10,
+                        padding: "1px 6px",
+                        borderRadius: 8,
+                        background: "var(--success, #1f9d55)",
+                        color: "#fff",
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      {t("providers.oauth.accountsConnected", {
+                        count: accountCount,
+                      })}
+                    </span>
+                  )}
+                </div>
+                <div className="settings-field-hint">{t(p.desc)}</div>
+                {hasAccounts && (
+                  <div
+                    className="settings-field-hint"
+                    style={{ marginTop: 4, opacity: 0.85 }}
+                  >
+                    {t("providers.oauth.rotationHint")}
+                  </div>
+                )}
+                <button
+                  className="btn btn-secondary btn-sm oauth-signin-btn"
+                  aria-label={`${
+                    hasAccounts
+                      ? t("providers.oauth.addAccount")
+                      : t("providers.oauth.signIn")
+                  } — ${p.name}`}
+                  onClick={() => setOauthModal(p)}
+                >
+                  <KeyRound size={14} />
+                  {hasAccounts
+                    ? t("providers.oauth.addAccount")
+                    : t("providers.oauth.signIn")}
+                </button>
               </div>
-              <div className="settings-field-hint">{t(p.desc)}</div>
-              <button
-                className="btn btn-secondary btn-sm oauth-signin-btn"
-                aria-label={`${t("providers.oauth.signIn")} — ${p.name}`}
-                onClick={() => setOauthModal(p)}
-              >
-                <KeyRound size={14} />
-                {t("providers.oauth.signIn")}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -599,6 +753,12 @@ function Providers({
           providerLabel={oauthModal.name}
           profile={profile}
           onClose={() => setOauthModal(null)}
+          // Reload the credential pool so the newly-added account (and its
+          // status badge) appears immediately in the list above and the
+          // card's account count updates — without navigating away/back.
+          onSuccess={() => {
+            void loadConfig();
+          }}
         />
       )}
     </div>

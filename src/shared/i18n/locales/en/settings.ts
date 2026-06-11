@@ -81,6 +81,15 @@ export default {
   remove: "Remove",
   keyLabel: "Key",
   empty: "(empty)",
+  poolActiveBadge: "Active",
+  poolActiveHint:
+    "This is the account Hermes is currently using for this provider, based on the configured selection strategy and account priority.",
+  poolExhaustedBadge: "Rate-limited",
+  poolExhaustedHint:
+    "This account is temporarily rate-limited or out of quota. Hermes skips it until its cooldown clears.",
+  poolDeadBadge: "Failed",
+  poolDeadHint:
+    "This account permanently failed authentication and is skipped. Re-add it to restore it to rotation.",
   dataSection: "Data",
   dataHint:
     "Export or import your Hermes configuration, sessions, skills, and memory.",
