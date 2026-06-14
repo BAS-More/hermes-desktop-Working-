@@ -512,7 +512,10 @@ function Layout({
             {remoteMode ? (
               <RemoteNotice feature="Factory" />
             ) : (
-              <Factory visible={view === "factory"} />
+              <Factory
+                visible={view === "factory"}
+                onNavigateToTask={() => goTo("kanban")}
+              />
             )}
           </div>
         )}

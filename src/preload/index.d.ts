@@ -153,12 +153,16 @@ interface GovernStatus {
   budget: {
     kill_switch: { active: boolean; paths: string[]; present_at: string[] };
     dimensions: string[];
+    default_max_iterations: number | null;
+    default_wallclock_seconds: number | null;
+    per_block_retry_cap: number | null;
   };
   orchestration: Record<string, unknown>;
   activity: {
     recent_governance_blocks: Array<Record<string, unknown>>;
     recent_budget_events: Array<Record<string, unknown>>;
     recent_builds: Array<Record<string, unknown>>;
+    change_log: Array<Record<string, unknown>>;
   };
 }
 interface GovernSetChange {
@@ -167,9 +171,12 @@ interface GovernSetChange {
   addProtected?: string;
   removeProtected?: string;
   profile?: string;
+  hybrid?: "on" | "off";
   orchestratorProfile?: string;
   defaultAssignee?: string;
   autoDecompose?: "on" | "off";
+  defaultMaxIterations?: number;
+  defaultWallclock?: number;
 }
 
 interface KanbanComment {

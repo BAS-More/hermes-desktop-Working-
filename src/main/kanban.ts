@@ -443,9 +443,12 @@ export interface GovernSetChange {
   addProtected?: string;
   removeProtected?: string;
   profile?: string;
+  hybrid?: "on" | "off";
   orchestratorProfile?: string;
   defaultAssignee?: string;
   autoDecompose?: "on" | "off";
+  defaultMaxIterations?: number;
+  defaultWallclock?: number;
 }
 
 export async function governSet(
@@ -457,10 +460,17 @@ export async function governSet(
   if (change.secretScan) args.push("--secret-scan", change.secretScan);
   if (change.addProtected) args.push("--add-protected", change.addProtected);
   if (change.removeProtected) args.push("--remove-protected", change.removeProtected);
-  if (change.profile) args.push("--profile", change.profile);
+  // --for-profile, not --profile: hermes's global --profile/-p switches the
+  // active profile and would be consumed before the kanban subparser sees it.
+  if (change.profile) args.push("--for-profile", change.profile);
+  if (change.hybrid) args.push("--hybrid", change.hybrid);
   if (change.orchestratorProfile) args.push("--orchestrator-profile", change.orchestratorProfile);
   if (change.defaultAssignee) args.push("--default-assignee", change.defaultAssignee);
   if (change.autoDecompose) args.push("--auto-decompose", change.autoDecompose);
+  if (change.defaultMaxIterations !== undefined)
+    args.push("--default-max-iterations", String(change.defaultMaxIterations));
+  if (change.defaultWallclock !== undefined)
+    args.push("--default-wallclock", String(change.defaultWallclock));
   const res = await runKanban(args, { parseJson: true });
   return { success: res.success, error: res.error, data: res.data };
 }
