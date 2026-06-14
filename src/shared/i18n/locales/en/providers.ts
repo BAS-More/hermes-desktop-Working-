@@ -6,6 +6,11 @@ export default {
     sectionHint:
       "Sign in with a provider subscription instead of an API key. Authorization happens in your browser.",
     signIn: "Sign in",
+    addAccount: "Add account",
+    accountsConnected_one: "{{count}} connected",
+    accountsConnected_other: "{{count}} connected",
+    rotationHint:
+      "Hermes rotates between connected accounts automatically and skips any that are rate-limited. Add more accounts to raise your effective limit.",
     runningHint: "Follow the steps below to finish signing in.",
     successHint: "Signed in successfully. You can now select this provider.",
     failed: "Sign-in failed.",

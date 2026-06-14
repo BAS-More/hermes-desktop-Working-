@@ -35,6 +35,7 @@ vi.mock("../src/main/installer", () => ({
   HERMES_HOME: TEST_HOME,
   HERMES_PYTHON: process.execPath,
   HERMES_REPO: TEST_REPO,
+  HERMES_VENV: join(TEST_HOME, "venv"),
   hermesCliArgs: hermesCliArgsSpy,
   getEnhancedPath: () => process.env.PATH || "",
 }));

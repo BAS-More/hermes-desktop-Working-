@@ -203,6 +203,11 @@ import {
   switchBoard as kanbanSwitchBoard,
   createBoard as kanbanCreateBoard,
   removeBoard as kanbanRemoveBoard,
+  governStatus as kanbanGovernStatus,
+  governSet as kanbanGovernSet,
+  governKillSwitch as kanbanGovernKillSwitch,
+  governModels as kanbanGovernModels,
+  type GovernSetChange,
   listTasks as kanbanListTasks,
   getTask as kanbanGetTask,
   createTask as kanbanCreateTask,
@@ -1681,6 +1686,15 @@ function setupIPC(): void {
     (_event, includeArchived?: boolean, profile?: string) =>
       kanbanListBoards(includeArchived, profile),
   );
+  // Factory governance
+  ipcMain.handle("kanban-govern-status", () => kanbanGovernStatus());
+  ipcMain.handle("kanban-govern-set", (_event, change: GovernSetChange) =>
+    kanbanGovernSet(change),
+  );
+  ipcMain.handle("kanban-govern-killswitch", (_event, on: boolean) =>
+    kanbanGovernKillSwitch(on),
+  );
+  ipcMain.handle("kanban-govern-models", () => kanbanGovernModels());
   ipcMain.handle("kanban-current-board", (_event, profile?: string) =>
     kanbanCurrentBoard(profile),
   );

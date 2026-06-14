@@ -20,6 +20,7 @@ import {
   HERMES_HOME,
   HERMES_REPO,
   HERMES_PYTHON,
+  HERMES_VENV,
   hermesCliArgs,
   getEnhancedPath,
 } from "./installer";
@@ -2610,6 +2611,90 @@ function gatewayLogPath(profile?: string): string {
   return join(logDir, "gateway-stderr.log");
 }
 
+// Local TLS-intercepting proxies (corporate MITM, the 9Router dev proxy,
+// Fiddler/mitmproxy, etc.) present a self-signed root CA that the Python
+// engine's bundled certifi store doesn't trust. The Node side of the app
+// is unaffected because Electron is launched with NODE_EXTRA_CA_CERTS, but
+// the gateway is a separate Python process whose httpx/requests/SDK calls
+// fail with `CERTIFICATE_VERIFY_FAILED` against every upstream (Anthropic,
+// Gemini, OpenAI, MCP servers). Symptom: "API call failed after 3 retries:
+// Streaming request failed: [SSL: CERTIFICATE_VERIFY_FAILED]".
+//
+// Candidate proxy-CA locations, in priority order. NODE_EXTRA_CA_CERTS (set
+// by the same proxies that need this fix) is checked first so we reuse
+// whatever Electron already trusts.
+function proxyCaCandidates(): string[] {
+  const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
+  const candidates = [
+    process.env.NODE_EXTRA_CA_CERTS,
+    join(appData, "9router", "mitm", "rootCA.crt"),
+  ];
+  return candidates.filter((p): p is string => !!p && existsSync(p));
+}
+
+// The engine resolves its CA bundle from HERMES_CA_BUNDLE / SSL_CERT_FILE /
+// REQUESTS_CA_BUNDLE (see hermes-agent/agent/model_metadata.py). When a
+// local proxy CA exists and the user hasn't already pointed those vars
+// somewhere, build a combined bundle (certifi + the proxy CA) under
+// HERMES_HOME and return the env vars that make every Python TLS callsite
+// trust it. Returns {} when there's nothing to do — no proxy CA, or the
+// user already set a bundle — so default installs are completely unaffected.
+function resolveProxyCaEnv(): Record<string, string> {
+  // Respect an explicit user/operator override — never clobber it.
+  if (
+    process.env.HERMES_CA_BUNDLE ||
+    process.env.SSL_CERT_FILE ||
+    process.env.REQUESTS_CA_BUNDLE
+  ) {
+    return {};
+  }
+
+  const proxyCa = proxyCaCandidates()[0];
+  if (!proxyCa) return {};
+
+  const certifiPem = join(
+    HERMES_VENV,
+    "Lib",
+    "site-packages",
+    "certifi",
+    "cacert.pem",
+  );
+  if (!existsSync(certifiPem)) return {};
+
+  const combined = join(HERMES_HOME, "ca-bundle-combined.pem");
+  try {
+    const base = readFileSync(certifiPem, "utf8");
+    const extra = readFileSync(proxyCa, "utf8");
+    // Regenerate only when missing or stale so we don't churn the file on
+    // every gateway start. Staleness keys on the proxy CA's bytes.
+    const marker = `# proxy-ca:${Buffer.byteLength(extra)}`;
+    const needsWrite =
+      !existsSync(combined) || !readFileSync(combined, "utf8").includes(marker);
+    if (needsWrite) {
+      writeFileSync(
+        combined,
+        `${base}\n${marker}\n# === Local TLS proxy CA (auto-added by Hermes Desktop) ===\n${extra}\n`,
+        "utf8",
+      );
+      console.log(
+        `[gateway] Trusting local TLS proxy CA (${proxyCa}) via ${combined}`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `[gateway] Could not build combined CA bundle: ${(err as Error).message}`,
+    );
+    return {};
+  }
+
+  return {
+    HERMES_CA_BUNDLE: combined,
+    SSL_CERT_FILE: combined,
+    REQUESTS_CA_BUNDLE: combined,
+    CURL_CA_BUNDLE: combined,
+  };
+}
+
 function buildGatewayEnv(profile?: string): Record<string, string> {
   // Make sure this profile's config.yaml enables the api_server and binds the
   // profile's own port before we spawn.
@@ -2626,6 +2711,11 @@ function buildGatewayEnv(profile?: string): Record<string, string> {
     // present (getProfilePort keeps it collision-free); this env value covers
     // the case where the block exists but omits an explicit port.
     API_SERVER_PORT: String(port),
+    // Trust a local TLS-intercepting proxy's CA so the Python gateway's
+    // httpx/requests/SDK calls don't fail with CERTIFICATE_VERIFY_FAILED.
+    // No-op ({}) on machines without such a proxy. Spread before the
+    // profile-env loop below so a user's explicit .env value still wins.
+    ...resolveProxyCaEnv(),
   };
 
   // Inject ALL profile API keys so the gateway can authenticate with any provider.

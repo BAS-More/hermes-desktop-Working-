@@ -131,6 +131,76 @@ interface KanbanBoard {
   db_path?: string;
 }
 
+// Factory governance status (mirror of `hermes kanban govern --json`).
+interface GovernProfileState {
+  profile: string;
+  level: string | null;
+  protected_paths: string[];
+  secret_scan: boolean;
+  hybrid: boolean;
+  model: string | null;
+  governed: boolean;
+}
+/** One active build in the orchestrator closed-loop (verify→correct→done). */
+interface GovernBuild {
+  root_id: string;
+  title: string | null;
+  task_status: string | null;
+  orchestrator: string | null;
+  loop_state: string | null; // building | verifying | correcting | done | parked
+  verify_round: number;
+  max_verify_rounds: number;
+  acceptance: string[];
+  last_verdict: string | null;
+  last_summary: string | null;
+  unmet: Array<Record<string, unknown>>;
+  updated_at: string | null;
+}
+interface GovernStatus {
+  schema: number;
+  governance: {
+    valid_levels: string[];
+    default_level: string;
+    level: string;
+    level_uniform: boolean;
+    secret_scan_patterns: number;
+    profiles: GovernProfileState[];
+  };
+  budget: {
+    kill_switch: { active: boolean; paths: string[]; present_at: string[] };
+    dimensions: string[];
+    default_max_iterations: number | null;
+    default_wallclock_seconds: number | null;
+    per_block_retry_cap: number | null;
+  };
+  orchestration: Record<string, unknown>;
+  builds?: GovernBuild[];
+  activity: {
+    recent_governance_blocks: Array<Record<string, unknown>>;
+    recent_budget_events: Array<Record<string, unknown>>;
+    recent_builds: Array<Record<string, unknown>>;
+    change_log: Array<Record<string, unknown>>;
+  };
+}
+interface GovernSetChange {
+  level?: "monitor" | "warn" | "gate" | "strict";
+  secretScan?: "on" | "off";
+  addProtected?: string;
+  removeProtected?: string;
+  profile?: string;
+  hybrid?: "on" | "off";
+  model?: string;
+  orchestratorProfile?: string;
+  defaultAssignee?: string;
+  autoDecompose?: "on" | "off";
+  autoDecomposePerTick?: number;
+  maxInProgress?: number;
+  orchestratorLoop?: "on" | "off";
+  maxVerifyRounds?: number;
+  defaultMaxIterations?: number;
+  defaultWallclock?: number;
+}
+
 interface KanbanComment {
   id: number;
   task_id: string;
@@ -749,6 +819,31 @@ interface HermesAPI {
   ) => Promise<{
     success: boolean;
     data?: KanbanBoard[];
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  // Factory governance
+  kanbanGovernStatus: () => Promise<{
+    success: boolean;
+    data?: GovernStatus;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernSet: (change: GovernSetChange) => Promise<{
+    success: boolean;
+    data?: unknown;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernKillSwitch: (on: boolean) => Promise<{
+    success: boolean;
+    data?: unknown;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernModels: () => Promise<{
+    success: boolean;
+    data?: { models: string[]; source: string; base_url: string | null };
     error?: string;
     unsupportedMode?: boolean;
   }>;

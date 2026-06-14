@@ -423,3 +423,81 @@ export async function dispatchOnce(
   const res = await runKanban(args, { profile, parseJson: true });
   return { success: res.success, error: res.error, data: res.data };
 }
+
+// ---------------------------------------------------------------------------
+// Factory governance (hermes kanban govern …)
+// ---------------------------------------------------------------------------
+
+/** Full factory governance/budget/orchestration/activity status document. */
+export async function governStatus(): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "--json"], { parseJson: true });
+  if (!res.success) return { success: false, error: res.error };
+  return { success: true, data: res.data };
+}
+
+/** Apply one or more governance/orchestration changes. */
+export interface GovernSetChange {
+  level?: "monitor" | "warn" | "gate" | "strict";
+  secretScan?: "on" | "off";
+  addProtected?: string;
+  removeProtected?: string;
+  profile?: string;
+  hybrid?: "on" | "off";
+  orchestratorProfile?: string;
+  defaultAssignee?: string;
+  autoDecompose?: "on" | "off";
+  autoDecomposePerTick?: number;
+  maxInProgress?: number;
+  orchestratorLoop?: "on" | "off";
+  maxVerifyRounds?: number;
+  model?: string;
+  defaultMaxIterations?: number;
+  defaultWallclock?: number;
+}
+
+export async function governSet(
+  change: GovernSetChange,
+): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const args = ["govern", "set"];
+  if (change.level) args.push("--level", change.level);
+  if (change.secretScan) args.push("--secret-scan", change.secretScan);
+  if (change.addProtected) args.push("--add-protected", change.addProtected);
+  if (change.removeProtected) args.push("--remove-protected", change.removeProtected);
+  // --for-profile, not --profile: hermes's global --profile/-p switches the
+  // active profile and would be consumed before the kanban subparser sees it.
+  if (change.profile) args.push("--for-profile", change.profile);
+  if (change.hybrid) args.push("--hybrid", change.hybrid);
+  if (change.orchestratorProfile) args.push("--orchestrator-profile", change.orchestratorProfile);
+  if (change.defaultAssignee) args.push("--default-assignee", change.defaultAssignee);
+  if (change.autoDecompose) args.push("--auto-decompose", change.autoDecompose);
+  if (change.autoDecomposePerTick !== undefined)
+    args.push("--auto-decompose-per-tick", String(change.autoDecomposePerTick));
+  if (change.maxInProgress !== undefined)
+    args.push("--max-in-progress", String(change.maxInProgress));
+  if (change.orchestratorLoop) args.push("--orchestrator-loop", change.orchestratorLoop);
+  if (change.maxVerifyRounds !== undefined)
+    args.push("--max-verify-rounds", String(change.maxVerifyRounds));
+  if (change.model) args.push("--model", change.model);
+  if (change.defaultMaxIterations !== undefined)
+    args.push("--default-max-iterations", String(change.defaultMaxIterations));
+  if (change.defaultWallclock !== undefined)
+    args.push("--default-wallclock", String(change.defaultWallclock));
+  const res = await runKanban(args, { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}
+
+/** Toggle the factory kill-switch (STOP sentinel). */
+export async function governKillSwitch(on: boolean): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "killswitch", on ? "on" : "off"], { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}
+
+/** Engine-compatible (cc/ + ag/) model list for the per-agent model picker. */
+export async function governModels(): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "models"], { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}

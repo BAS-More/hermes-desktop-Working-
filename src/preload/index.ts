@@ -940,6 +940,13 @@ const hermesAPI = {
   // Kanban
   kanbanListBoards: (includeArchived?: boolean, profile?: string) =>
     ipcRenderer.invoke("kanban-list-boards", includeArchived, profile),
+  // Factory governance
+  kanbanGovernStatus: () => ipcRenderer.invoke("kanban-govern-status"),
+  kanbanGovernSet: (change: unknown) =>
+    ipcRenderer.invoke("kanban-govern-set", change),
+  kanbanGovernKillSwitch: (on: boolean) =>
+    ipcRenderer.invoke("kanban-govern-killswitch", on),
+  kanbanGovernModels: () => ipcRenderer.invoke("kanban-govern-models"),
   kanbanCurrentBoard: (profile?: string) =>
     ipcRenderer.invoke("kanban-current-board", profile),
   kanbanSwitchBoard: (slug: string, profile?: string) =>
