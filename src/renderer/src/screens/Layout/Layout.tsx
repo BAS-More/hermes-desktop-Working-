@@ -118,6 +118,8 @@ function Layout({
     kind: "skills" | "mcps";
     nonce: number;
   } | null>(null);
+  // Set by the Factory Builds pane to open a build's task detail in Kanban.
+  const [kanbanFocusTaskId, setKanbanFocusTaskId] = useState<string | null>(null);
 
   const paneStyle = (target: View): React.CSSProperties => ({
     display: view === target ? "flex" : "none",
@@ -135,6 +137,14 @@ function Layout({
     (kind: "skills" | "mcps") => {
       setDiscoverFocus((prev) => ({ kind, nonce: (prev?.nonce ?? 0) + 1 }));
       goTo("discover");
+    },
+    [goTo],
+  );
+
+  const focusKanbanTask = useCallback(
+    (taskId: string) => {
+      setKanbanFocusTaskId(taskId);
+      goTo("kanban");
     },
     [goTo],
   );
@@ -502,7 +512,12 @@ function Layout({
             {remoteMode ? (
               <RemoteNotice feature="Kanban" />
             ) : (
-              <Kanban profile={activeProfile} visible={view === "kanban"} />
+              <Kanban
+                profile={activeProfile}
+                visible={view === "kanban"}
+                focusTaskId={kanbanFocusTaskId}
+                onFocusHandled={() => setKanbanFocusTaskId(null)}
+              />
             )}
           </div>
         )}
@@ -514,7 +529,7 @@ function Layout({
             ) : (
               <Factory
                 visible={view === "factory"}
-                onNavigateToTask={() => goTo("kanban")}
+                onNavigateToTask={focusKanbanTask}
               />
             )}
           </div>

@@ -16,6 +16,10 @@ import { useI18n } from "../../components/useI18n";
 interface KanbanProps {
   profile?: string;
   visible?: boolean;
+  /** When set (e.g. from the Factory Builds pane), open this task's detail. */
+  focusTaskId?: string | null;
+  /** Called once the focus request has been consumed, so the parent can clear it. */
+  onFocusHandled?: () => void;
 }
 
 interface KanbanTask {
@@ -136,7 +140,7 @@ function ageLabel(createdAt: number | null): string {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function Kanban({ profile, visible }: KanbanProps): React.JSX.Element {
+function Kanban({ profile, visible, focusTaskId, onFocusHandled }: KanbanProps): React.JSX.Element {
   const { t } = useI18n();
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
@@ -314,6 +318,15 @@ function Kanban({ profile, visible }: KanbanProps): React.JSX.Element {
       cancelled = true;
     };
   }, [detailTaskId, profile]);
+
+  // External focus request (e.g. clicking a build in the Factory pane): open
+  // that task's detail once this screen is visible, then notify the parent so
+  // the one-shot request is cleared (re-clicking the same task re-focuses).
+  useEffect(() => {
+    if (!visible || !focusTaskId) return;
+    setDetailTaskId(focusTaskId);
+    onFocusHandled?.();
+  }, [visible, focusTaskId, onFocusHandled]);
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<string, KanbanTask[]> = {};
