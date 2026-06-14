@@ -206,6 +206,7 @@ import {
   governStatus as kanbanGovernStatus,
   governSet as kanbanGovernSet,
   governKillSwitch as kanbanGovernKillSwitch,
+  governModels as kanbanGovernModels,
   type GovernSetChange,
   listTasks as kanbanListTasks,
   getTask as kanbanGetTask,
@@ -1693,6 +1694,7 @@ function setupIPC(): void {
   ipcMain.handle("kanban-govern-killswitch", (_event, on: boolean) =>
     kanbanGovernKillSwitch(on),
   );
+  ipcMain.handle("kanban-govern-models", () => kanbanGovernModels());
   ipcMain.handle("kanban-current-board", (_event, profile?: string) =>
     kanbanCurrentBoard(profile),
   );

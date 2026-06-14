@@ -138,6 +138,7 @@ interface GovernProfileState {
   protected_paths: string[];
   secret_scan: boolean;
   hybrid: boolean;
+  model: string | null;
   governed: boolean;
 }
 interface GovernStatus {
@@ -172,9 +173,12 @@ interface GovernSetChange {
   removeProtected?: string;
   profile?: string;
   hybrid?: "on" | "off";
+  model?: string;
   orchestratorProfile?: string;
   defaultAssignee?: string;
   autoDecompose?: "on" | "off";
+  autoDecomposePerTick?: number;
+  maxInProgress?: number;
   defaultMaxIterations?: number;
   defaultWallclock?: number;
 }
@@ -816,6 +820,12 @@ interface HermesAPI {
   kanbanGovernKillSwitch: (on: boolean) => Promise<{
     success: boolean;
     data?: unknown;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernModels: () => Promise<{
+    success: boolean;
+    data?: { models: string[]; source: string; base_url: string | null };
     error?: string;
     unsupportedMode?: boolean;
   }>;

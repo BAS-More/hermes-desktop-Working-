@@ -447,6 +447,9 @@ export interface GovernSetChange {
   orchestratorProfile?: string;
   defaultAssignee?: string;
   autoDecompose?: "on" | "off";
+  autoDecomposePerTick?: number;
+  maxInProgress?: number;
+  model?: string;
   defaultMaxIterations?: number;
   defaultWallclock?: number;
 }
@@ -467,6 +470,11 @@ export async function governSet(
   if (change.orchestratorProfile) args.push("--orchestrator-profile", change.orchestratorProfile);
   if (change.defaultAssignee) args.push("--default-assignee", change.defaultAssignee);
   if (change.autoDecompose) args.push("--auto-decompose", change.autoDecompose);
+  if (change.autoDecomposePerTick !== undefined)
+    args.push("--auto-decompose-per-tick", String(change.autoDecomposePerTick));
+  if (change.maxInProgress !== undefined)
+    args.push("--max-in-progress", String(change.maxInProgress));
+  if (change.model) args.push("--model", change.model);
   if (change.defaultMaxIterations !== undefined)
     args.push("--default-max-iterations", String(change.defaultMaxIterations));
   if (change.defaultWallclock !== undefined)
@@ -479,5 +487,12 @@ export async function governSet(
 export async function governKillSwitch(on: boolean): Promise<KanbanResult<unknown>> {
   if (isRemoteOnlyMode()) return unsupportedInRemote();
   const res = await runKanban(["govern", "killswitch", on ? "on" : "off"], { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}
+
+/** Engine-compatible (cc/ + ag/) model list for the per-agent model picker. */
+export async function governModels(): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "models"], { parseJson: true });
   return { success: res.success, error: res.error, data: res.data };
 }

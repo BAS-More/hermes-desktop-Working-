@@ -8,6 +8,7 @@ interface GovernProfileState {
   protected_paths: string[];
   secret_scan: boolean;
   hybrid: boolean;
+  model: string | null;
   governed: boolean;
 }
 interface GovernStatus {
@@ -73,6 +74,8 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
   const [fDecision, setFDecision] = useState<string>("all");
   const [fCode, setFCode] = useState<string>("all");
   const [fProfile, setFProfile] = useState<string>("all");
+  // Engine-compatible model catalog (cc/ + ag/) for the per-agent picker.
+  const [models, setModels] = useState<string[]>([]);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,6 +100,14 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
   useEffect(() => {
     if (visible) void load();
   }, [visible, load]);
+
+  // Fetch the model catalog once when the tab first becomes visible.
+  useEffect(() => {
+    if (!visible) return;
+    void window.hermesAPI.kanbanGovernModels().then((res) => {
+      if (res.success && res.data) setModels(res.data.models || []);
+    });
+  }, [visible]);
 
   // Auto-refresh while visible.
   useEffect(() => {
@@ -147,6 +158,31 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
   );
 
   const askConfirm = (msg: string, onYes: () => void) => setConfirm({ msg, onYes });
+
+  // Change a profile's model. "__advanced__" prompts for a custom id; a cx/ id
+  // is warned about here (the engine also hard-rejects it).
+  const changeModel = useCallback(
+    (profile: string, value: string, prev: string | null) => {
+      let id = value;
+      if (value === "__advanced__") {
+        const typed = window.prompt(
+          `Custom model id for ${profile} (cc/ or ag/ only — cx/ is rejected: it breaks tool calls):`,
+          prev || "",
+        );
+        if (!typed) return;
+        id = typed.trim();
+      }
+      if (id.toLowerCase().startsWith("cx/")) {
+        setError(`'${id}' is a cx/ (OpenAI-shape) id — it breaks the adapter and will be rejected. Use cc/ or ag/.`);
+        return;
+      }
+      const undo = prev && prev !== id
+        ? () => void apply({ model: prev, profile }, { toast: `Reverted ${profile} model → ${prev}` })
+        : undefined;
+      void apply({ model: id, profile }, { toast: `${profile} model → ${id}`, undo });
+    },
+    [apply],
+  );
 
   if (loading && !status) {
     return (
@@ -280,7 +316,7 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
       <table className="factory-table">
         <thead>
           <tr>
-            <th>Profile</th><th>Level</th><th>Secrets</th><th>Hybrid</th><th>Protected</th>
+            <th>Profile</th><th>Level</th><th>Secrets</th><th>Hybrid</th><th>Model</th><th>Protected</th>
           </tr>
         </thead>
         <tbody>
@@ -320,6 +356,15 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
                   )}>
                   {p.hybrid ? "on" : "off"}
                 </button>
+              </td>
+              <td>
+                <select className="factory-select" value={p.model || ""} disabled={busy}
+                  onChange={(e) => changeModel(p.profile, e.target.value, p.model)}>
+                  {/* current value, even if not in the catalog, stays selectable */}
+                  {p.model && !models.includes(p.model) && <option value={p.model}>{p.model}</option>}
+                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value="__advanced__">＋ custom…</option>
+                </select>
               </td>
               <td>{p.protected_paths.length}</td>
             </tr>
@@ -398,15 +443,62 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
     </div>
   );
 
+    const profileNames = g.profiles.map((p) => p.profile);
+  const orchProfile = String(orch.orchestrator_profile ?? "");
+  const defAssignee = String(orch.default_assignee ?? "");
+  const autoDec = orch.auto_decompose === true || orch.auto_decompose === "true";
   const Orchestration = (
     <div className="settings-section" key="orch">
       <div className="settings-section-title">ORCHESTRATION</div>
-      <table className="factory-table">
+      <p className="models-subtitle" style={{ marginTop: -4 }}>
+        Which agent runs the build, who catches unrouted work, and how aggressively the board fans out.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "10px 16px", alignItems: "center", maxWidth: 560 }}>
+        <label className="factory-field-label">Orchestrator profile</label>
+        <select className="factory-select" value={orchProfile} disabled={busy}
+          onChange={(e) => void apply({ orchestratorProfile: e.target.value }, { toast: `Orchestrator → ${e.target.value}` })}>
+          {!profileNames.includes(orchProfile) && orchProfile && <option value={orchProfile}>{orchProfile}</option>}
+          {profileNames.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        <label className="factory-field-label">Default assignee</label>
+        <select className="factory-select" value={defAssignee} disabled={busy}
+          onChange={(e) => void apply({ defaultAssignee: e.target.value }, { toast: `Default assignee → ${e.target.value}` })}>
+          {!profileNames.includes(defAssignee) && defAssignee && <option value={defAssignee}>{defAssignee}</option>}
+          {profileNames.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        <label className="factory-field-label">Auto-decompose</label>
+        <button className={"factory-toggle " + (autoDec ? "on" : "off")} disabled={busy} style={{ width: "fit-content" }}
+          onClick={() => void apply({ autoDecompose: autoDec ? "off" : "on" }, { toast: `Auto-decompose ${autoDec ? "off" : "on"}` })}>
+          {autoDec ? "on" : "off"}
+        </button>
+
+        <label className="factory-field-label">Auto-decompose per tick</label>
+        <input type="number" min={1} className="factory-input" style={{ width: 100 }}
+          defaultValue={Number(orch.auto_decompose_per_tick ?? 3)} disabled={busy}
+          onBlur={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (v && v !== Number(orch.auto_decompose_per_tick))
+              void apply({ autoDecomposePerTick: v }, { toast: `Per-tick → ${v}` });
+          }} />
+
+        <label className="factory-field-label">Max in-progress / profile</label>
+        <input type="number" min={1} className="factory-input" style={{ width: 100 }}
+          defaultValue={Number(orch.max_in_progress_per_profile ?? 1)} disabled={busy}
+          onBlur={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (v && v !== Number(orch.max_in_progress_per_profile))
+              void apply({ maxInProgress: v }, { toast: `Max in-progress → ${v}` });
+          }} />
+      </div>
+      {/* Read-only lower-level knobs */}
+      <table className="factory-table" style={{ marginTop: 12 }}>
         <tbody>
-          {Object.entries(orch).map(([k, v]) => (
+          {["failure_limit", "dispatch_in_gateway"].map((k) => (
             <tr key={k}>
               <td style={{ fontWeight: 600 }}>{k}</td>
-              <td>{v === null || v === undefined ? "—" : String(v)}</td>
+              <td>{orch[k] === null || orch[k] === undefined ? "—" : String(orch[k])}</td>
             </tr>
           ))}
         </tbody>
