@@ -449,6 +449,8 @@ export interface GovernSetChange {
   autoDecompose?: "on" | "off";
   autoDecomposePerTick?: number;
   maxInProgress?: number;
+  orchestratorLoop?: "on" | "off";
+  maxVerifyRounds?: number;
   model?: string;
   defaultMaxIterations?: number;
   defaultWallclock?: number;
@@ -474,6 +476,9 @@ export async function governSet(
     args.push("--auto-decompose-per-tick", String(change.autoDecomposePerTick));
   if (change.maxInProgress !== undefined)
     args.push("--max-in-progress", String(change.maxInProgress));
+  if (change.orchestratorLoop) args.push("--orchestrator-loop", change.orchestratorLoop);
+  if (change.maxVerifyRounds !== undefined)
+    args.push("--max-verify-rounds", String(change.maxVerifyRounds));
   if (change.model) args.push("--model", change.model);
   if (change.defaultMaxIterations !== undefined)
     args.push("--default-max-iterations", String(change.defaultMaxIterations));

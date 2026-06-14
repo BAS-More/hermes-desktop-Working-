@@ -9496,6 +9496,16 @@ body {
   font-size: 12px;
   font-family: var(--font-mono, monospace);
 }
+/* Orchestrator closed-loop build cards */
+.factory-build-card {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.factory-build-card:hover {
+  border-color: #555 !important;
+}
+.factory-linkbtn:hover {
+  text-decoration: underline;
+}
 .factory-chip-x {
   border: none;
   background: transparent;

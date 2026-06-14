@@ -11,6 +11,20 @@ interface GovernProfileState {
   model: string | null;
   governed: boolean;
 }
+interface GovernBuild {
+  root_id: string;
+  title: string | null;
+  task_status: string | null;
+  orchestrator: string | null;
+  loop_state: string | null;
+  verify_round: number;
+  max_verify_rounds: number;
+  acceptance: string[];
+  last_verdict: string | null;
+  last_summary: string | null;
+  unmet: Array<Record<string, unknown>>;
+  updated_at: string | null;
+}
 interface GovernStatus {
   schema: number;
   governance: {
@@ -29,6 +43,7 @@ interface GovernStatus {
     per_block_retry_cap: number | null;
   };
   orchestration: Record<string, unknown>;
+  builds?: GovernBuild[];
   activity: {
     recent_governance_blocks: Array<Record<string, unknown>>;
     recent_budget_events: Array<Record<string, unknown>>;
@@ -211,6 +226,9 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
   const allBlocks = status!.activity.recent_governance_blocks ?? [];
   const builds = status!.activity.recent_builds ?? [];
   const changeLog = status!.activity.change_log ?? [];
+  // Orchestrator closed-loop: live builds + loop config.
+  const loopBuilds = status!.builds ?? [];
+  const loopOn = orch.orchestrator_loop === true || orch.orchestrator_loop === "true";
 
   // ---- filtered activity ----
   const blocks = allBlocks.filter((b) => {
@@ -491,6 +509,33 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
             if (v && v !== Number(orch.max_in_progress_per_profile))
               void apply({ maxInProgress: v }, { toast: `Max in-progress → ${v}` });
           }} />
+
+        <label className="factory-field-label" style={{ gridColumn: "1 / -1", borderTop: "1px solid #333", paddingTop: 10, marginTop: 4, fontWeight: 700 }}>
+          Closed-loop oversight
+        </label>
+        <label className="factory-field-label">Orchestrator loop</label>
+        <button className={"factory-toggle " + (loopOn ? "on" : "off")} disabled={busy} style={{ width: "fit-content" }}
+          onClick={() => {
+            if (loopOn) {
+              void apply({ orchestratorLoop: "off" }, { toast: "Closed-loop OFF" });
+            } else {
+              askConfirm(
+                "Enable the orchestrator closed-loop? When ON, a finished build is VERIFIED against its acceptance criteria; if it falls short the orchestrator commands corrective work and re-verifies (up to the round cap) before escalating to you. This changes how builds complete. In-flight builds are unaffected.",
+                () => void apply({ orchestratorLoop: "on" }, { toast: "Closed-loop ON" }),
+              );
+            }
+          }}>
+          {loopOn ? "on" : "off"}
+        </button>
+
+        <label className="factory-field-label">Max verify rounds</label>
+        <input type="number" min={1} max={10} className="factory-input" style={{ width: 100 }}
+          defaultValue={Number(orch.max_verify_rounds ?? 3)} disabled={busy}
+          onBlur={(e) => {
+            const v = parseInt(e.target.value, 10);
+            if (v && v !== Number(orch.max_verify_rounds ?? 3))
+              void apply({ maxVerifyRounds: v }, { toast: `Max verify rounds → ${v}` });
+          }} />
       </div>
       {/* Read-only lower-level knobs */}
       <table className="factory-table" style={{ marginTop: 12 }}>
@@ -591,10 +636,85 @@ function Factory({ visible, onNavigateToTask }: FactoryProps = {}): React.JSX.El
     </div>
   );
 
+  // ---- BUILDS: the orchestrator closed-loop oversight pane ----
+  const loopStateMeta: Record<string, { label: string; color: string }> = {
+    building: { label: "Building", color: "#61afef" },
+    verifying: { label: "Verifying", color: "#e5c07b" },
+    correcting: { label: "Correcting", color: "#d19a66" },
+    done: { label: "Done", color: "#98c379" },
+    parked: { label: "Escalated — needs you", color: "#e06c75" },
+  };
+  const Builds = (
+    <div className="settings-section" key="builds">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="settings-section-title">BUILDS — orchestrator oversight</div>
+        <span className={"factory-chip"} style={{ background: loopOn ? "#2c4a2c" : "#3a3a3a", color: loopOn ? "#98c379" : "#999" }}>
+          closed-loop {loopOn ? "ON" : "OFF"}
+        </span>
+      </div>
+      <p className="models-subtitle" style={{ marginTop: -2 }}>
+        Each build the orchestrator is overseeing — its goal, the acceptance criteria it must meet,
+        and where it is in the verify → correct → done loop.
+      </p>
+      {!loopOn && (
+        <div className="factory-callout" style={{ margin: "8px 0", padding: "8px 12px", border: "1px solid #444", borderRadius: 6, fontSize: 12, color: "#aaa" }}>
+          The closed-loop is off — builds fan out once and assemble without verification. Turn it on in
+          <b> Orchestration → Closed-loop oversight</b> to have the orchestrator verify each build against its
+          acceptance criteria and command corrections.
+        </div>
+      )}
+      {loopBuilds.length === 0 ? (
+        <div style={{ fontSize: 13, color: "#888", padding: "8px 0" }}>No tracked builds yet.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {loopBuilds.map((b) => {
+            const meta = loopStateMeta[b.loop_state ?? ""] ?? { label: b.loop_state ?? "—", color: "#888" };
+            const parked = b.loop_state === "parked";
+            return (
+              <div key={b.root_id} className="factory-build-card"
+                style={{ border: `1px solid ${parked ? "#e06c75" : "#333"}`, borderRadius: 8, padding: "10px 12px",
+                  background: parked ? "rgba(224,108,117,0.06)" : "transparent" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <button className="factory-linkbtn"
+                    style={{ fontWeight: 600, fontSize: 13, textAlign: "left", background: "none", border: "none", color: "#61afef", cursor: "pointer", padding: 0 }}
+                    title="Open this build's task in Kanban"
+                    onClick={() => onNavigateToTask?.(b.root_id)}>
+                    {b.title || b.root_id}
+                  </button>
+                  <span className="factory-chip" style={{ background: meta.color + "22", color: meta.color, whiteSpace: "nowrap" }}>
+                    {meta.label}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#aaa", margin: "6px 0" }}>
+                  <span>orchestrator: <b>{b.orchestrator || "—"}</b></span>
+                  <span>verify round: <b>{b.verify_round}/{b.max_verify_rounds}</b></span>
+                  {b.last_verdict && <span>last verdict: <b style={{ color: b.last_verdict === "PASS" ? "#98c379" : "#e06c75" }}>{b.last_verdict}</b></span>}
+                </div>
+                {b.acceptance.length > 0 && (
+                  <details style={{ fontSize: 12, marginTop: 4 }}>
+                    <summary style={{ cursor: "pointer", color: "#ccc" }}>Acceptance criteria ({b.acceptance.length})</summary>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: "#bbb" }}>
+                      {b.acceptance.map((c, i) => <li key={i}>{c}</li>)}
+                    </ul>
+                  </details>
+                )}
+                {parked && b.last_summary && (
+                  <div style={{ fontSize: 12, color: "#e06c75", marginTop: 6 }}>
+                    <b>Why escalated:</b> {b.last_summary}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   const order: Record<LayoutMode, React.JSX.Element[]> = {
-    control: [Governance, Budget, Orchestration, Activity],
-    monitor: [Activity, Governance, Budget, Orchestration],
-    classic: [Governance, Budget, Orchestration, Activity],
+    control: [Governance, Builds, Budget, Orchestration, Activity],
+    monitor: [Builds, Activity, Governance, Budget, Orchestration],
+    classic: [Governance, Budget, Orchestration, Builds, Activity],
   };
 
   return (

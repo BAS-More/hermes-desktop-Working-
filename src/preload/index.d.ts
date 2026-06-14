@@ -141,6 +141,21 @@ interface GovernProfileState {
   model: string | null;
   governed: boolean;
 }
+/** One active build in the orchestrator closed-loop (verify→correct→done). */
+interface GovernBuild {
+  root_id: string;
+  title: string | null;
+  task_status: string | null;
+  orchestrator: string | null;
+  loop_state: string | null; // building | verifying | correcting | done | parked
+  verify_round: number;
+  max_verify_rounds: number;
+  acceptance: string[];
+  last_verdict: string | null;
+  last_summary: string | null;
+  unmet: Array<Record<string, unknown>>;
+  updated_at: string | null;
+}
 interface GovernStatus {
   schema: number;
   governance: {
@@ -159,6 +174,7 @@ interface GovernStatus {
     per_block_retry_cap: number | null;
   };
   orchestration: Record<string, unknown>;
+  builds?: GovernBuild[];
   activity: {
     recent_governance_blocks: Array<Record<string, unknown>>;
     recent_budget_events: Array<Record<string, unknown>>;
@@ -179,6 +195,8 @@ interface GovernSetChange {
   autoDecompose?: "on" | "off";
   autoDecomposePerTick?: number;
   maxInProgress?: number;
+  orchestratorLoop?: "on" | "off";
+  maxVerifyRounds?: number;
   defaultMaxIterations?: number;
   defaultWallclock?: number;
 }
