@@ -131,6 +131,47 @@ interface KanbanBoard {
   db_path?: string;
 }
 
+// Factory governance status (mirror of `hermes kanban govern --json`).
+interface GovernProfileState {
+  profile: string;
+  level: string | null;
+  protected_paths: string[];
+  secret_scan: boolean;
+  hybrid: boolean;
+  governed: boolean;
+}
+interface GovernStatus {
+  schema: number;
+  governance: {
+    valid_levels: string[];
+    default_level: string;
+    level: string;
+    level_uniform: boolean;
+    secret_scan_patterns: number;
+    profiles: GovernProfileState[];
+  };
+  budget: {
+    kill_switch: { active: boolean; paths: string[]; present_at: string[] };
+    dimensions: string[];
+  };
+  orchestration: Record<string, unknown>;
+  activity: {
+    recent_governance_blocks: Array<Record<string, unknown>>;
+    recent_budget_events: Array<Record<string, unknown>>;
+    recent_builds: Array<Record<string, unknown>>;
+  };
+}
+interface GovernSetChange {
+  level?: "monitor" | "warn" | "gate" | "strict";
+  secretScan?: "on" | "off";
+  addProtected?: string;
+  removeProtected?: string;
+  profile?: string;
+  orchestratorProfile?: string;
+  defaultAssignee?: string;
+  autoDecompose?: "on" | "off";
+}
+
 interface KanbanComment {
   id: number;
   task_id: string;
@@ -749,6 +790,25 @@ interface HermesAPI {
   ) => Promise<{
     success: boolean;
     data?: KanbanBoard[];
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  // Factory governance
+  kanbanGovernStatus: () => Promise<{
+    success: boolean;
+    data?: GovernStatus;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernSet: (change: GovernSetChange) => Promise<{
+    success: boolean;
+    data?: unknown;
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
+  kanbanGovernKillSwitch: (on: boolean) => Promise<{
+    success: boolean;
+    data?: unknown;
     error?: string;
     unsupportedMode?: boolean;
   }>;

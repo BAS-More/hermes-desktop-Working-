@@ -423,3 +423,51 @@ export async function dispatchOnce(
   const res = await runKanban(args, { profile, parseJson: true });
   return { success: res.success, error: res.error, data: res.data };
 }
+
+// ---------------------------------------------------------------------------
+// Factory governance (hermes kanban govern …)
+// ---------------------------------------------------------------------------
+
+/** Full factory governance/budget/orchestration/activity status document. */
+export async function governStatus(): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "--json"], { parseJson: true });
+  if (!res.success) return { success: false, error: res.error };
+  return { success: true, data: res.data };
+}
+
+/** Apply one or more governance/orchestration changes. */
+export interface GovernSetChange {
+  level?: "monitor" | "warn" | "gate" | "strict";
+  secretScan?: "on" | "off";
+  addProtected?: string;
+  removeProtected?: string;
+  profile?: string;
+  orchestratorProfile?: string;
+  defaultAssignee?: string;
+  autoDecompose?: "on" | "off";
+}
+
+export async function governSet(
+  change: GovernSetChange,
+): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const args = ["govern", "set"];
+  if (change.level) args.push("--level", change.level);
+  if (change.secretScan) args.push("--secret-scan", change.secretScan);
+  if (change.addProtected) args.push("--add-protected", change.addProtected);
+  if (change.removeProtected) args.push("--remove-protected", change.removeProtected);
+  if (change.profile) args.push("--profile", change.profile);
+  if (change.orchestratorProfile) args.push("--orchestrator-profile", change.orchestratorProfile);
+  if (change.defaultAssignee) args.push("--default-assignee", change.defaultAssignee);
+  if (change.autoDecompose) args.push("--auto-decompose", change.autoDecompose);
+  const res = await runKanban(args, { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}
+
+/** Toggle the factory kill-switch (STOP sentinel). */
+export async function governKillSwitch(on: boolean): Promise<KanbanResult<unknown>> {
+  if (isRemoteOnlyMode()) return unsupportedInRemote();
+  const res = await runKanban(["govern", "killswitch", on ? "on" : "off"], { parseJson: true });
+  return { success: res.success, error: res.error, data: res.data };
+}

@@ -18,6 +18,7 @@ import Models from "../Models/Models";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
+import Factory from "../Factory/Factory";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import hermeslogo from "../../assets/hermes-one.svg";
@@ -34,6 +35,7 @@ import {
   KeyRound,
   Timer,
   Kanban as KanbanIcon,
+  ShieldCheck as FactoryIcon,
   Download,
   PanelLeftClose,
   PanelLeftOpen,
@@ -54,6 +56,7 @@ type View =
   | "tools"
   | "schedules"
   | "kanban"
+  | "factory"
   | "gateway"
   | "settings";
 
@@ -65,6 +68,7 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // "Manage profiles" action rather than a top-level nav item.
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
+  { view: "factory", icon: FactoryIcon, labelKey: "navigation.factory" },
   { view: "models", icon: Layers, labelKey: "navigation.models" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   // "skills" lives under the Discover tab (installed + community), so it's no
@@ -499,6 +503,16 @@ function Layout({
               <RemoteNotice feature="Kanban" />
             ) : (
               <Kanban profile={activeProfile} visible={view === "kanban"} />
+            )}
+          </div>
+        )}
+
+        {visitedViews.has("factory") && (
+          <div style={paneStyle("factory")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Factory" />
+            ) : (
+              <Factory visible={view === "factory"} />
             )}
           </div>
         )}

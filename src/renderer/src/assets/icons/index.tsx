@@ -23,6 +23,7 @@ export {
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Signal,
   Sparkles,
   Sun,
