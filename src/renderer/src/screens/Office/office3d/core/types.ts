@@ -21,6 +21,15 @@ export type OfficeAgent = {
   gatewayRunning?: boolean;
   /** Org position; defaults to "employee" when unset. The CEO gets a desk. */
   position?: AgentPosition;
+  /**
+   * Factory celebration deadline: Date.now() ms until which this bot should
+   * play the dancing animation. Set by `enrichOfficeAgentsWithBuilds` when a
+   * tracked factory build flips to `loop_state === "done"` for the first
+   * time. Unset on stale renders; the AgentsLayer simulation reads it inside
+   * its per-frame step. Janitor actors don't carry this — they are local
+   * cleaning routines, not factory participants.
+   */
+  celebrateUntil?: number;
 };
 
 export type JanitorTool = "broom" | "vacuum" | "floor_scrubber";
@@ -80,6 +89,14 @@ export type RenderAgent = SceneActor & {
   workoutStyle?: "run" | "lift" | "bike" | "box" | "row" | "stretch";
   janitorRouteIndex?: number;
   janitorPauseUntil?: number;
+  /**
+   * Factory celebration deadline (ms). Present on the render agent regardless
+   * of which SceneActor it wraps so the simulation can read it unconditionally;
+   * only office agents (not janitors) ever have it set. Mirrors OfficeAgent's
+   * field — kept here too because RenderAgent = SceneActor & {…} and the
+   * janitor arm of that union has no celebrateUntil.
+   */
+  celebrateUntil?: number;
 };
 
 export type FurnitureItem = {

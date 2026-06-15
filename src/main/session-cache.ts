@@ -4,6 +4,8 @@ import {
   profileHome,
   getActiveProfileNameSync,
   activeStateDbPath,
+  listAllStateDbPaths,
+  stateDbPathForProfile,
   safeWriteFile,
 } from "./utils";
 import Database from "better-sqlite3";
@@ -267,5 +269,152 @@ export function removeSessionFromCache(sessionId: string): void {
   if (next.length !== cache.sessions.length) {
     cache.sessions = next;
     writeCache(cache);
+  }
+}
+
+// ===========================================================================
+// Multi-profile cache sync. The single-profile sync above keys everything on
+// the active profile. The aggregator below syncs the title cache for EACH
+// profile DB so generated titles are computed once and persisted per profile,
+// then returns nothing — the renderer reads the merged list from
+// sessions.listAllSessions (which itself merges live DB rows + desktop meta).
+//
+// We still run the per-profile sync because it backfills `title` into the
+// engine's state.db for sessions that never had one, which listAllSessions
+// then surfaces.
+// ===========================================================================
+
+function cacheFilePathForProfile(profile: string): string {
+  return join(profileHome(profile), "desktop", "sessions.json");
+}
+
+function readCacheForProfile(profile: string): CacheData {
+  const file = cacheFilePathForProfile(profile);
+  try {
+    if (!existsSync(file)) return { sessions: [], lastSync: 0 };
+    return JSON.parse(readFileSync(file, "utf-8"));
+  } catch {
+    return { sessions: [], lastSync: 0 };
+  }
+}
+
+function writeCacheForProfile(profile: string, data: CacheData): void {
+  try {
+    safeWriteFile(cacheFilePathForProfile(profile), JSON.stringify(data));
+  } catch {
+    // non-fatal
+  }
+}
+
+/**
+ * Backfill generated titles into each profile's state.db + cache file. Run on
+ * the Sessions tab open so titles are stable across the aggregated view.
+ * Best-effort per profile; a failing DB is skipped.
+ */
+export function syncAllSessionCaches(): void {
+  for (const { profile, dbPath } of listAllStateDbPaths()) {
+    let db: Database.Database | null = null;
+    try {
+      db = new Database(dbPath, { readonly: true });
+      const cache = readCacheForProfile(profile);
+      const existingIds = new Set(cache.sessions.map((s) => s.id));
+      const rows = db
+        .prepare(
+          `SELECT s.id, s.started_at, s.source, s.message_count, s.model, s.title
+           FROM sessions s ORDER BY s.started_at DESC`,
+        )
+        .all() as Array<{
+        id: string;
+        started_at: number;
+        source: string;
+        message_count: number;
+        model: string;
+        title: string | null;
+      }>;
+      const merged: CachedSession[] = [...cache.sessions];
+      for (const row of rows) {
+        if (existingIds.has(row.id)) continue;
+        let title = row.title || "";
+        if (!title) {
+          try {
+            const msg = db
+              .prepare(
+                `SELECT content FROM messages
+                 WHERE session_id = ? AND role = 'user' AND content IS NOT NULL
+                 ORDER BY timestamp, id LIMIT 1`,
+              )
+              .get(row.id) as { content: string } | undefined;
+            title = msg
+              ? generateTitle(msg.content)
+              : t("sessions.newConversation", getAppLocale());
+          } catch {
+            title = t("sessions.newConversation", getAppLocale());
+          }
+        }
+        merged.push({
+          id: row.id,
+          title,
+          startedAt: row.started_at,
+          source: row.source,
+          messageCount: row.message_count,
+          model: row.model || "",
+        });
+      }
+      merged.sort((a, b) => b.startedAt - a.startedAt);
+      writeCacheForProfile(profile, {
+        sessions: merged,
+        lastSync: Math.floor(Date.now() / 1000),
+      });
+    } catch (err) {
+      console.error(`syncAllSessionCaches: skipping ${dbPath}`, err);
+    } finally {
+      db?.close();
+    }
+  }
+}
+
+/**
+ * Update a session title in a specific profile's cache + state.db (the
+ * profile-aware sibling of updateSessionTitle, which only ever touched the
+ * active profile).
+ */
+export function updateSessionTitleInProfile(
+  profile: string,
+  sessionId: string,
+  title: string,
+): void {
+  const cache = readCacheForProfile(profile);
+  const idx = cache.sessions.findIndex((s) => s.id === sessionId);
+  if (idx >= 0) {
+    cache.sessions[idx].title = title;
+    writeCacheForProfile(profile, cache);
+  }
+  try {
+    const dbPath = stateDbPathForProfile(profile);
+    if (existsSync(dbPath)) {
+      const db = new Database(dbPath);
+      try {
+        db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(
+          title,
+          sessionId,
+        );
+      } finally {
+        db.close();
+      }
+    }
+  } catch {
+    // ignore — cache update above is the fast path
+  }
+}
+
+/** Remove a session from its profile's cache file (post-delete cleanup). */
+export function removeSessionFromProfileCache(
+  profile: string,
+  sessionId: string,
+): void {
+  const cache = readCacheForProfile(profile);
+  const next = cache.sessions.filter((s) => s.id !== sessionId);
+  if (next.length !== cache.sessions.length) {
+    writeCacheForProfile(profile, { ...cache, sessions: next });
   }
 }

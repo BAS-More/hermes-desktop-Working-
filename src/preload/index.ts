@@ -35,6 +35,37 @@ interface GatewayStartResult {
   logPath?: string;
 }
 
+/**
+ * Aggregated session shapes — mirror of sessions.ts AggregatedSession /
+ * AggregatedSearchResult / SessionGroup. Preload is type-checked under
+ * tsconfig.node.json which doesn't pull in the main-process types, so the
+ * shapes are restated here (same pattern as CredentialPoolEntry).
+ */
+interface AggregatedSession {
+  id: string;
+  profile: string;
+  title: string | null;
+  startedAt: number;
+  source: string;
+  messageCount: number;
+  model: string;
+  archived: boolean;
+  pinned: boolean;
+  status: "active" | "paused" | "complete";
+  groupId: string | null;
+}
+interface AggregatedSearchResult extends AggregatedSession {
+  snippet: string;
+}
+interface SessionGroupInfo {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  createdAt: number;
+  profile: string;
+}
+
 const electronAPI = {
   process: {
     platform: process.platform,
@@ -786,6 +817,83 @@ const hermesAPI = {
       snippet: string;
     }>
   > => ipcRenderer.invoke("search-sessions", query, limit),
+
+  // Multi-profile session aggregation + desktop session metadata.
+  listAllSessions: (limit?: number): Promise<AggregatedSession[]> =>
+    ipcRenderer.invoke("list-all-sessions", limit),
+  syncAllSessionCaches: (): Promise<AggregatedSession[]> =>
+    ipcRenderer.invoke("sync-all-session-caches"),
+  searchAllSessions: (
+    query: string,
+    limit?: number,
+  ): Promise<AggregatedSearchResult[]> =>
+    ipcRenderer.invoke("search-all-sessions", query, limit),
+  getSessionMessagesFromProfile: (
+    profile: string,
+    sessionId: string,
+  ): Promise<
+    Array<{
+      id: number;
+      role: "user" | "assistant";
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    }>
+  > =>
+    ipcRenderer.invoke(
+      "get-session-messages-from-profile",
+      profile,
+      sessionId,
+    ),
+  deleteSessionInProfile: (
+    profile: string,
+    sessionId: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("delete-session-in-profile", profile, sessionId),
+  deleteSessionsByProfile: (
+    byProfile: Record<string, string[]>,
+  ): Promise<{ requested: number; deleted: number }> =>
+    ipcRenderer.invoke("delete-sessions-by-profile", byProfile),
+  renameSession: (
+    profile: string,
+    sessionId: string,
+    title: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("rename-session", profile, sessionId, title),
+  setSessionArchived: (
+    profile: string,
+    sessionId: string,
+    archived: boolean,
+  ): Promise<void> =>
+    ipcRenderer.invoke("set-session-archived", profile, sessionId, archived),
+  setSessionPinned: (
+    profile: string,
+    sessionId: string,
+    pinned: boolean,
+  ): Promise<void> =>
+    ipcRenderer.invoke("set-session-pinned", profile, sessionId, pinned),
+  setSessionStatus: (
+    profile: string,
+    sessionId: string,
+    status: "active" | "paused" | "complete",
+  ): Promise<void> =>
+    ipcRenderer.invoke("set-session-status", profile, sessionId, status),
+  moveSessionToGroup: (
+    profile: string,
+    sessionId: string,
+    groupId: string | null,
+  ): Promise<void> =>
+    ipcRenderer.invoke("move-session-to-group", profile, sessionId, groupId),
+  listSessionGroups: (): Promise<SessionGroupInfo[]> =>
+    ipcRenderer.invoke("list-session-groups"),
+  createSessionGroup: (
+    profile: string,
+    name: string,
+    color?: string | null,
+  ): Promise<SessionGroupInfo | null> =>
+    ipcRenderer.invoke("create-session-group", profile, name, color),
+  deleteSessionGroup: (profile: string, groupId: string): Promise<void> =>
+    ipcRenderer.invoke("delete-session-group", profile, groupId),
 
   // Credential Pool (profile-aware: reads/writes the named profile's
   // auth.json; defaults to the currently active profile when omitted)

@@ -100,6 +100,33 @@ interface CredentialPoolEntry {
   key?: string;
 }
 
+/** One session as surfaced by the multi-profile aggregator. */
+interface AggregatedSession {
+  id: string;
+  profile: string;
+  title: string | null;
+  startedAt: number;
+  source: string;
+  messageCount: number;
+  model: string;
+  archived: boolean;
+  pinned: boolean;
+  status: "active" | "paused" | "complete";
+  groupId: string | null;
+}
+interface AggregatedSearchResult extends AggregatedSession {
+  snippet: string;
+}
+/** A desktop-owned session group, tagged with the profile it lives in. */
+interface SessionGroupInfo {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  createdAt: number;
+  profile: string;
+}
+
 interface KanbanTask {
   id: string;
   title: string;
@@ -723,6 +750,65 @@ interface HermesAPI {
       snippet: string;
     }>
   >;
+
+  // Multi-profile session aggregation + desktop session metadata.
+  listAllSessions: (limit?: number) => Promise<AggregatedSession[]>;
+  syncAllSessionCaches: () => Promise<AggregatedSession[]>;
+  searchAllSessions: (
+    query: string,
+    limit?: number,
+  ) => Promise<AggregatedSearchResult[]>;
+  getSessionMessagesFromProfile: (
+    profile: string,
+    sessionId: string,
+  ) => Promise<
+    Array<{
+      id: number;
+      role: "user" | "assistant";
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    }>
+  >;
+  deleteSessionInProfile: (
+    profile: string,
+    sessionId: string,
+  ) => Promise<void>;
+  deleteSessionsByProfile: (
+    byProfile: Record<string, string[]>,
+  ) => Promise<{ requested: number; deleted: number }>;
+  renameSession: (
+    profile: string,
+    sessionId: string,
+    title: string,
+  ) => Promise<void>;
+  setSessionArchived: (
+    profile: string,
+    sessionId: string,
+    archived: boolean,
+  ) => Promise<void>;
+  setSessionPinned: (
+    profile: string,
+    sessionId: string,
+    pinned: boolean,
+  ) => Promise<void>;
+  setSessionStatus: (
+    profile: string,
+    sessionId: string,
+    status: "active" | "paused" | "complete",
+  ) => Promise<void>;
+  moveSessionToGroup: (
+    profile: string,
+    sessionId: string,
+    groupId: string | null,
+  ) => Promise<void>;
+  listSessionGroups: () => Promise<SessionGroupInfo[]>;
+  createSessionGroup: (
+    profile: string,
+    name: string,
+    color?: string | null,
+  ) => Promise<SessionGroupInfo | null>;
+  deleteSessionGroup: (profile: string, groupId: string) => Promise<void>;
 
   // Credential Pool (profile-aware) — entries follow the upstream
   // engine schema (issue #367). See `CredentialPoolEntry` below.

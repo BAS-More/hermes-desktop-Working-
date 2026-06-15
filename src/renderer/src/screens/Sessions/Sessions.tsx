@@ -1,28 +1,60 @@
-import { useEffect, useState, useRef, useCallback, useMemo, memo } from "react";
-import { Plus, Search, X, ChatBubble, Trash, Pencil } from "../../assets/icons";
+import {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  memo,
+} from "react";
+import {
+  Plus,
+  Search,
+  X,
+  ChatBubble,
+  Trash,
+  Pencil,
+  Pause,
+  Play,
+  Check,
+  Copy,
+  Send,
+  Circle,
+} from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
+import { defaultColorForName } from "../../../../shared/profileColors";
 
-interface CachedSession {
+type SessionStatus = "active" | "paused" | "complete";
+
+interface SessionRow {
   id: string;
-  title: string;
-  startedAt: number;
-  source: string;
-  messageCount: number;
-  model: string;
-}
-
-interface SearchResult {
-  sessionId: string;
+  profile: string;
   title: string | null;
   startedAt: number;
   source: string;
   messageCount: number;
   model: string;
+  archived: boolean;
+  pinned: boolean;
+  status: SessionStatus;
+  groupId: string | null;
+}
+
+interface SearchRow extends SessionRow {
   snippet: string;
 }
 
+interface SessionGroupInfo {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  createdAt: number;
+  profile: string;
+}
+
 interface SessionsProps {
-  onResumeSession: (sessionId: string) => void;
+  /** Resume now carries the profile so the right state.db / gateway is used. */
+  onResumeSession: (sessionId: string, profile: string) => void;
   onNewChat: () => void;
   currentSessionId: string | null;
   visible: boolean;
@@ -70,9 +102,9 @@ function getDateGroup(ts: number): DateGroup {
 }
 
 function groupSessions(
-  sessions: CachedSession[],
-): Array<{ label: DateGroup; sessions: CachedSession[] }> {
-  const groups = new Map<DateGroup, CachedSession[]>();
+  sessions: SessionRow[],
+): Array<{ label: DateGroup; sessions: SessionRow[] }> {
+  const groups = new Map<DateGroup, SessionRow[]>();
   for (const s of sessions) {
     const group = getDateGroup(s.startedAt);
     if (!groups.has(group)) groups.set(group, []);
@@ -113,20 +145,218 @@ function cleanSearchSnippet(snippet: string, preserveMarkers = false): string {
 
 function formatModel(model: string): string {
   const name = model.split("/").pop() || model;
-  // Shorten common patterns: "gpt-oss-20b:free" → "gpt-oss-20b"
   return name.split(":")[0];
 }
+
+// How often the Sessions tab re-syncs from state.db while it is open.
+export const SESSIONS_REFRESH_MS = 30_000;
+
+/** Small profile pill rendered on each card. */
+function ProfileChip({ profile }: { profile: string }): React.JSX.Element {
+  const color = defaultColorForName(profile);
+  return (
+    <span
+      className="sessions-tag sessions-tag--profile"
+      style={{
+        borderColor: color,
+        color,
+      }}
+      title={profile}
+    >
+      {profile}
+    </span>
+  );
+}
+
+function StatusDot({ status }: { status: SessionStatus }): React.JSX.Element | null {
+  if (status === "active") return null;
+  const color = status === "paused" ? "#e5c07b" : "#98c379";
+  return (
+    <Circle
+      size={8}
+      fill={color}
+      style={{ color, flex: "0 0 auto" }}
+      aria-hidden
+    />
+  );
+}
+
+/**
+ * Per-card overflow action menu. Renders a `…` button that opens a popover
+ * with the 10 session actions. Closes on outside-click / Escape.
+ */
+const SessionActionMenu = memo(function SessionActionMenu({
+  session,
+  groups,
+  onPinToggle,
+  onPauseResume,
+  onMarkComplete,
+  onRename,
+  onCopyLink,
+  onShare,
+  onMoveToGroup,
+  onNewGroup,
+  onArchiveToggle,
+  onDelete,
+}: {
+  session: SessionRow;
+  groups: SessionGroupInfo[];
+  onPinToggle: () => void;
+  onPauseResume: () => void;
+  onMarkComplete: () => void;
+  onRename: () => void;
+  onCopyLink: () => void;
+  onShare: () => void;
+  onMoveToGroup: (groupId: string | null) => void;
+  onNewGroup: () => void;
+  onArchiveToggle: () => void;
+  onDelete: () => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [submenu, setSubmenu] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSubmenu(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setSubmenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const run = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(false);
+    setSubmenu(false);
+    fn();
+  };
+
+  return (
+    <div className="sessions-menu" ref={ref}>
+      <button
+        type="button"
+        className="sessions-card-menu-btn"
+        title={t("sessions.actions.menu")}
+        aria-label={t("sessions.actions.menu")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <span aria-hidden>⋯</span>
+      </button>
+      {open && (
+        <div className="sessions-menu-popover" role="menu">
+          <button role="menuitem" onClick={run(onPinToggle)}>
+            {session.pinned
+              ? t("sessions.actions.unpin")
+              : t("sessions.actions.pin")}
+          </button>
+          <button role="menuitem" onClick={run(onPauseResume)}>
+            {session.status === "paused" ? (
+              <>
+                <Play size={13} /> {t("sessions.actions.resume")}
+              </>
+            ) : (
+              <>
+                <Pause size={13} /> {t("sessions.actions.pause")}
+              </>
+            )}
+          </button>
+          {session.status !== "complete" && (
+            <button role="menuitem" onClick={run(onMarkComplete)}>
+              <Check size={13} /> {t("sessions.actions.markComplete")}
+            </button>
+          )}
+          <button role="menuitem" onClick={run(onRename)}>
+            <Pencil size={13} /> {t("sessions.actions.rename")}
+          </button>
+          <div className="sessions-menu-sub">
+            <button
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={submenu}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSubmenu((v) => !v);
+              }}
+            >
+              {t("sessions.actions.moveToGroup")} ▸
+            </button>
+            {submenu && (
+              <div className="sessions-menu-popover sessions-menu-popover--sub">
+                <button
+                  role="menuitem"
+                  onClick={run(() => onMoveToGroup(null))}
+                >
+                  {t("sessions.noGroup")}
+                </button>
+                {groups.map((g) => (
+                  <button
+                    key={g.id}
+                    role="menuitem"
+                    onClick={run(() => onMoveToGroup(g.id))}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+                <button role="menuitem" onClick={run(onNewGroup)}>
+                  {t("sessions.newGroup")}
+                </button>
+              </div>
+            )}
+          </div>
+          <button role="menuitem" onClick={run(onCopyLink)}>
+            <Copy size={13} /> {t("sessions.actions.copyLink")}
+          </button>
+          <button role="menuitem" onClick={run(onShare)}>
+            <Send size={13} /> {t("sessions.actions.share")}
+          </button>
+          <button role="menuitem" onClick={run(onArchiveToggle)}>
+            {session.archived
+              ? t("sessions.actions.unarchive")
+              : t("sessions.actions.archive")}
+          </button>
+          <button
+            role="menuitem"
+            className="sessions-menu-danger"
+            onClick={run(onDelete)}
+          >
+            <Trash size={13} /> {t("sessions.actions.delete")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
 
 // Memoized session card
 const SessionCard = memo(function SessionCard({
   session,
+  groups,
   isActive,
   showFullDate,
   onClick,
   onDelete,
-  deleteTitle,
   onRename,
-  renameTitle,
   isRenaming = false,
   renameValue = "",
   onRenameChange,
@@ -137,16 +367,22 @@ const SessionCard = memo(function SessionCard({
   selected = false,
   onToggleSelected,
   selectTitle,
+  onPinToggle,
+  onPauseResume,
+  onMarkComplete,
+  onCopyLink,
+  onShare,
+  onMoveToGroup,
+  onNewGroup,
+  onArchiveToggle,
 }: {
-  session: CachedSession;
+  session: SessionRow;
+  groups: SessionGroupInfo[];
   isActive: boolean;
   showFullDate: boolean;
   onClick: () => void;
-  // When provided, renders a trash icon button on the card. Closes #408.
-  onDelete?: (id: string) => void;
-  deleteTitle?: string;
-  onRename?: (id: string, title: string) => void;
-  renameTitle?: string;
+  onDelete: (session: SessionRow) => void;
+  onRename: (session: SessionRow) => void;
   isRenaming?: boolean;
   renameValue?: string;
   onRenameChange?: (value: string) => void;
@@ -157,6 +393,14 @@ const SessionCard = memo(function SessionCard({
   selected?: boolean;
   onToggleSelected?: (id: string) => void;
   selectTitle?: string;
+  onPinToggle: (session: SessionRow) => void;
+  onPauseResume: (session: SessionRow) => void;
+  onMarkComplete: (session: SessionRow) => void;
+  onCopyLink: (session: SessionRow) => void;
+  onShare: (session: SessionRow) => void;
+  onMoveToGroup: (session: SessionRow, groupId: string | null) => void;
+  onNewGroup: (session: SessionRow) => void;
+  onArchiveToggle: (session: SessionRow) => void;
 }) {
   const activate = (): void => {
     if (selectionMode) {
@@ -166,17 +410,13 @@ const SessionCard = memo(function SessionCard({
     onClick();
   };
 
-  // `div` instead of `button` because nesting a button-inside-button is
-  // invalid HTML and many a11y / interaction layers (focus trap, keyboard
-  // navigation) break on it. Click + Enter/Space behavior matches the
-  // previous semantics via explicit role + onKeyDown.
   return (
     <div
       role="button"
       tabIndex={0}
       className={`sessions-card ${isActive ? "sessions-card--active" : ""} ${
         selected ? "sessions-card--selected" : ""
-      }`}
+      } ${session.pinned ? "sessions-card--pinned" : ""}`}
       onClick={activate}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -199,6 +439,7 @@ const SessionCard = memo(function SessionCard({
             />
           </label>
         )}
+        <StatusDot status={session.status} />
         {isRenaming ? (
           <input
             ref={renameInputRef}
@@ -231,6 +472,7 @@ const SessionCard = memo(function SessionCard({
         </span>
       </div>
       <div className="sessions-card-tags">
+        <ProfileChip profile={session.profile} />
         <span className="sessions-tag sessions-tag--source">
           {session.source}
         </span>
@@ -242,50 +484,26 @@ const SessionCard = memo(function SessionCard({
             {formatModel(session.model)}
           </span>
         )}
-        {!selectionMode && onRename && !isRenaming && (
-          <button
-            type="button"
-            className="sessions-card-rename"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRename(session.id, session.title);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-            title={renameTitle}
-            aria-label={renameTitle}
-          >
-            <Pencil size={14} />
-          </button>
-        )}
-        {!selectionMode && onDelete && !isRenaming && (
-          <button
-            type="button"
-            className="sessions-card-delete"
-            onClick={(e) => {
-              // Stop propagation so the parent card's onClick (which
-              // resumes the session) doesn't also fire — clicking the
-              // trash must NEVER take the user into the chat they're
-              // trying to delete.
-              e.stopPropagation();
-              onDelete(session.id);
-            }}
-            // Block keyboard activation of the parent card-as-button too.
-            onKeyDown={(e) => e.stopPropagation()}
-            title={deleteTitle}
-            aria-label={deleteTitle}
-          >
-            <Trash size={14} />
-          </button>
+        {!selectionMode && !isRenaming && (
+          <SessionActionMenu
+            session={session}
+            groups={groups}
+            onPinToggle={() => onPinToggle(session)}
+            onPauseResume={() => onPauseResume(session)}
+            onMarkComplete={() => onMarkComplete(session)}
+            onRename={() => onRename(session)}
+            onCopyLink={() => onCopyLink(session)}
+            onShare={() => onShare(session)}
+            onMoveToGroup={(gid) => onMoveToGroup(session, gid)}
+            onNewGroup={() => onNewGroup(session)}
+            onArchiveToggle={() => onArchiveToggle(session)}
+            onDelete={() => onDelete(session)}
+          />
         )}
       </div>
     </div>
   );
 });
-
-// How often the Sessions tab re-syncs from state.db while it is open, so
-// sessions created in the background (cron jobs, gateway platforms, another
-// device) surface without the user navigating away and back. (refs #322)
-export const SESSIONS_REFRESH_MS = 30_000;
 
 function Sessions({
   onResumeSession,
@@ -294,29 +512,30 @@ function Sessions({
   visible,
 }: SessionsProps): React.JSX.Element {
   const { t } = useI18n();
-  const [sessions, setSessions] = useState<CachedSession[]>([]);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [groups, setGroups] = useState<SessionGroupInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchRow[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
-    string | null
-  >(null);
-  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
-    null,
-  );
+  const [showArchived, setShowArchived] = useState(false);
+  const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [toast, setToast] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<SessionRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [pendingBulkDeleteIds, setPendingBulkDeleteIds] = useState<
-    string[] | null
+  const [pendingBulkDelete, setPendingBulkDelete] = useState<
+    SessionRow[] | null
   >(null);
   const [deletingBulk, setDeletingBulk] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestId = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Rename state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -326,52 +545,168 @@ function Sessions({
     editingSessionIdRef.current = editingSessionId;
   }, [editingSessionId]);
 
-  // Quiet re-sync from state.db — refreshes the list WITHOUT flipping the
-  // loading state, so it can run on a timer or on focus with no spinner flash.
+  const showToast = useCallback((msg: string): void => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  const sessionById = useCallback(
+    (id: string): SessionRow | undefined => sessions.find((s) => s.id === id),
+    [sessions],
+  );
+
+  const loadGroups = useCallback(async (): Promise<void> => {
+    try {
+      const g = await window.hermesAPI.listSessionGroups();
+      setGroups(g);
+    } catch {
+      /* groups are optional sugar */
+    }
+  }, []);
+
   const refreshSessions = useCallback(async (): Promise<void> => {
-    const synced = await window.hermesAPI.syncSessionCache();
-    setSessions(synced.slice(0, 50));
+    const synced = await window.hermesAPI.syncAllSessionCaches();
+    setSessions(synced as SessionRow[]);
   }, []);
 
   const loadSessions = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const cached = await window.hermesAPI.listCachedSessions(50);
-      if (cached.length > 0) {
-        setSessions(cached);
-      }
-
-      const synced = await window.hermesAPI.syncSessionCache();
-      setSessions(synced.slice(0, 50));
+      const cached = await window.hermesAPI.listAllSessions(200);
+      if (cached.length > 0) setSessions(cached as SessionRow[]);
+      const synced = await window.hermesAPI.syncAllSessionCaches();
+      setSessions(synced as SessionRow[]);
+      await loadGroups();
     } catch (error) {
       console.error("Failed to load sessions", error);
     } finally {
       setLoading(false);
     }
-    await refreshSessions();
-    setLoading(false);
-  }, [refreshSessions]);
+  }, [loadGroups]);
 
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
 
-  const handleDelete = useCallback((sessionId: string): void => {
-    setPendingDeleteSessionId(sessionId);
-  }, []);
-
-  const startRename = useCallback(
-    (sessionId: string, currentTitle: string): void => {
-      setEditingSessionId(sessionId);
-      setEditingTitle(currentTitle || "");
-      // Focus the input on the next tick after render
-      setTimeout(() => {
-        renameInputRef.current?.focus();
-        renameInputRef.current?.select();
-      }, 0);
+  // ---- per-session mutations (optimistic, then refresh) ----
+  const patchSession = useCallback(
+    (id: string, patch: Partial<SessionRow>): void => {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      );
     },
     [],
   );
+
+  const handlePinToggle = useCallback(
+    (s: SessionRow): void => {
+      patchSession(s.id, { pinned: !s.pinned });
+      void window.hermesAPI.setSessionPinned(s.profile, s.id, !s.pinned);
+    },
+    [patchSession],
+  );
+
+  const handlePauseResume = useCallback(
+    (s: SessionRow): void => {
+      const next: SessionStatus = s.status === "paused" ? "active" : "paused";
+      patchSession(s.id, { status: next });
+      void window.hermesAPI.setSessionStatus(s.profile, s.id, next);
+    },
+    [patchSession],
+  );
+
+  const handleMarkComplete = useCallback(
+    (s: SessionRow): void => {
+      patchSession(s.id, { status: "complete" });
+      void window.hermesAPI.setSessionStatus(s.profile, s.id, "complete");
+    },
+    [patchSession],
+  );
+
+  const handleArchiveToggle = useCallback(
+    (s: SessionRow): void => {
+      patchSession(s.id, { archived: !s.archived });
+      void window.hermesAPI.setSessionArchived(s.profile, s.id, !s.archived);
+    },
+    [patchSession],
+  );
+
+  const sessionLink = (s: SessionRow): string =>
+    `hermes://session/${encodeURIComponent(s.profile)}/${encodeURIComponent(
+      s.id,
+    )}`;
+
+  const handleCopyLink = useCallback(
+    (s: SessionRow): void => {
+      void navigator.clipboard
+        ?.writeText(sessionLink(s))
+        .then(() => showToast(t("sessions.actions.linkCopied")))
+        .catch(() => {
+          /* clipboard may be unavailable */
+        });
+    },
+    [showToast, t],
+  );
+
+  const handleShare = useCallback(
+    (s: SessionRow): void => {
+      const link = sessionLink(s);
+      const title = s.title || t("sessions.newConversation");
+      const nav = navigator as Navigator & {
+        share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+      };
+      if (typeof nav.share === "function") {
+        void nav.share({ title, text: title, url: link }).catch(() => {
+          /* user dismissed or unsupported — fall back below */
+        });
+      } else {
+        handleCopyLink(s);
+      }
+    },
+    [handleCopyLink, t],
+  );
+
+  const handleMoveToGroup = useCallback(
+    (s: SessionRow, groupId: string | null): void => {
+      patchSession(s.id, { groupId });
+      void window.hermesAPI.moveSessionToGroup(s.profile, s.id, groupId);
+    },
+    [patchSession],
+  );
+
+  const handleNewGroup = useCallback(
+    (s: SessionRow): void => {
+      const name = window.prompt(t("sessions.newGroupPrompt"));
+      if (!name || !name.trim()) return;
+      void (async () => {
+        const created = await window.hermesAPI.createSessionGroup(
+          s.profile,
+          name.trim(),
+        );
+        if (created) {
+          await loadGroups();
+          patchSession(s.id, { groupId: created.id });
+          void window.hermesAPI.moveSessionToGroup(
+            s.profile,
+            s.id,
+            created.id,
+          );
+        }
+      })();
+    },
+    [t, loadGroups, patchSession],
+  );
+
+  // ---- rename ----
+  const startRename = useCallback((s: SessionRow): void => {
+    setEditingSessionId(s.id);
+    setEditingTitle(s.title || "");
+    setTimeout(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }, 0);
+  }, []);
 
   const cancelRename = useCallback((): void => {
     setEditingSessionId(null);
@@ -385,84 +720,62 @@ function Sessions({
         cancelRename();
         return;
       }
-      // Capture old titles so we can roll back on failure.
-      let oldSessionTitle = "";
-      let oldSearchResultTitle = "";
-      // Optimistic update
-      setSessions((prev) => {
-        oldSessionTitle = prev.find((s) => s.id === sessionId)?.title ?? "";
-        return prev.map((s) =>
-          s.id === sessionId ? { ...s, title: trimmed } : s,
-        );
-      });
-      setSearchResults((prev) => {
-        oldSearchResultTitle =
-          prev.find((r) => r.sessionId === sessionId)?.title ?? "";
-        return prev.map((r) =>
-          r.sessionId === sessionId ? { ...r, title: trimmed } : r,
-        );
-      });
-      try {
-        await window.hermesAPI.updateSessionTitle(sessionId, trimmed);
-      } catch (err) {
-        console.error("Failed to rename session", sessionId, err);
-        // Rollback optimistic update
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === sessionId ? { ...s, title: oldSessionTitle } : s,
-          ),
-        );
-        setSearchResults((prev) =>
-          prev.map((r) =>
-            r.sessionId === sessionId
-              ? { ...r, title: oldSearchResultTitle }
-              : r,
-          ),
-        );
+      const target = sessionById(sessionId);
+      patchSession(sessionId, { title: trimmed });
+      setSearchResults((prev) =>
+        prev.map((r) => (r.id === sessionId ? { ...r, title: trimmed } : r)),
+      );
+      if (target) {
+        try {
+          await window.hermesAPI.renameSession(
+            target.profile,
+            sessionId,
+            trimmed,
+          );
+        } catch (err) {
+          console.error("Failed to rename session", sessionId, err);
+        }
       }
-      // Guard: only clear editing state if the user hasn't started editing
-      // a different session while this request was in flight.
       if (editingSessionIdRef.current === sessionId) {
         setEditingSessionId(null);
         setEditingTitle("");
       }
     },
-    [cancelRename],
+    [cancelRename, sessionById, patchSession],
   );
 
+  // ---- delete ----
+  const handleDelete = useCallback((s: SessionRow): void => {
+    setPendingDelete(s);
+  }, []);
+
   const cancelDelete = useCallback((): void => {
-    if (deletingSessionId) return;
-    setPendingDeleteSessionId(null);
-  }, [deletingSessionId]);
+    if (deleting) return;
+    setPendingDelete(null);
+  }, [deleting]);
 
   const confirmDelete = useCallback(
-    async (sessionId: string): Promise<void> => {
-      // Optimistic UI update: drop the row from both the main list and
-      // any active search results so the user sees instant feedback even
-      // if the SQLite write or cache rewrite has any latency.  The
-      // subsequent refresh re-syncs from state.db so we recover if the
-      // backend deletion failed.
-      setDeletingSessionId(sessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      setSearchResults((prev) => prev.filter((r) => r.sessionId !== sessionId));
+    async (s: SessionRow): Promise<void> => {
+      setDeleting(true);
+      setSessions((prev) => prev.filter((x) => x.id !== s.id));
+      setSearchResults((prev) => prev.filter((x) => x.id !== s.id));
       try {
-        await window.hermesAPI.deleteSession(sessionId);
+        await window.hermesAPI.deleteSessionInProfile(s.profile, s.id);
       } catch (err) {
-        console.error("Failed to delete session", sessionId, err);
+        console.error("Failed to delete session", s.id, err);
       } finally {
         await refreshSessions();
-        setDeletingSessionId(null);
-        setPendingDeleteSessionId(null);
+        setDeleting(false);
+        setPendingDelete(null);
       }
     },
     [refreshSessions],
   );
 
+  // ---- selection / bulk delete ----
   const toggleSelectionMode = useCallback((): void => {
     setIsSelectionMode((active) => {
-      if (active) {
-        setSelectedSessionIds(new Set());
-      }
+      if (active) setSelectedSessionIds(new Set());
       return !active;
     });
   }, []);
@@ -470,42 +783,35 @@ function Sessions({
   const toggleSessionSelected = useCallback((sessionId: string): void => {
     setSelectedSessionIds((prev) => {
       const next = new Set(prev);
-      if (next.has(sessionId)) {
-        next.delete(sessionId);
-      } else {
-        next.add(sessionId);
-      }
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
       return next;
     });
   }, []);
 
   const cancelBulkDelete = useCallback((): void => {
     if (deletingBulk) return;
-    setPendingBulkDeleteIds(null);
+    setPendingBulkDelete(null);
   }, [deletingBulk]);
 
   const confirmBulkDelete = useCallback(
-    async (sessionIds: string[]): Promise<void> => {
-      const ids = Array.from(new Set(sessionIds.map((id) => id.trim()))).filter(
-        Boolean,
-      );
-      if (ids.length === 0) {
-        setPendingBulkDeleteIds(null);
-        return;
+    async (rows: SessionRow[]): Promise<void> => {
+      const byProfile: Record<string, string[]> = {};
+      for (const r of rows) {
+        (byProfile[r.profile] ??= []).push(r.id);
       }
-
-      const idSet = new Set(ids);
+      const idSet = new Set(rows.map((r) => r.id));
       setDeletingBulk(true);
       setSessions((prev) => prev.filter((s) => !idSet.has(s.id)));
-      setSearchResults((prev) => prev.filter((r) => !idSet.has(r.sessionId)));
+      setSearchResults((prev) => prev.filter((r) => !idSet.has(r.id)));
       try {
-        await window.hermesAPI.deleteSessions(ids);
+        await window.hermesAPI.deleteSessionsByProfile(byProfile);
       } catch (err) {
-        console.error("Failed to delete selected sessions", ids, err);
+        console.error("Failed to delete selected sessions", err);
       } finally {
         await refreshSessions();
         setDeletingBulk(false);
-        setPendingBulkDeleteIds(null);
+        setPendingBulkDelete(null);
         setSelectedSessionIds(new Set());
         setIsSelectionMode(false);
       }
@@ -513,44 +819,12 @@ function Sessions({
     [refreshSessions],
   );
 
+  // Refresh when becoming visible.
   useEffect(() => {
-    if (
-      (!pendingDeleteSessionId && !pendingBulkDeleteIds) ||
-      deletingSessionId ||
-      deletingBulk
-    ) {
-      return;
-    }
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setPendingDeleteSessionId(null);
-        setPendingBulkDeleteIds(null);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    deletingBulk,
-    deletingSessionId,
-    pendingBulkDeleteIds,
-    pendingDeleteSessionId,
-  ]);
-
-  // Refresh sessions whenever the Sessions view becomes visible.
-  // This ensures new sessions created in the Chat view (via "+")
-  // appear immediately when the user navigates back to Sessions,
-  // and also fixes stale sessions list after clearing search.
-  useEffect(() => {
-    if (visible) {
-      loadSessions();
-    }
+    if (visible) loadSessions();
   }, [visible, loadSessions]);
 
-  // While the Sessions tab is actually showing, periodically re-sync so
-  // sessions created in the background — cron jobs, gateway platforms, or
-  // another device writing the same state.db — surface even if the user
-  // just leaves this tab open. Also refresh when the window regains focus.
-  // Gated on `visible`: no timer and no DB reads while another screen shows.
+  // Periodic re-sync while visible.
   useEffect(() => {
     if (!visible) return;
     const timer = setInterval(() => {
@@ -566,6 +840,7 @@ function Sessions({
     };
   }, [visible, refreshSessions]);
 
+  // Search (across all profiles).
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const query = searchQuery.trim();
@@ -580,13 +855,11 @@ function Sessions({
     setIsSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const results = await window.hermesAPI.searchSessions(query);
+        const results = await window.hermesAPI.searchAllSessions(query);
         if (searchRequestId.current !== requestId) return;
-        setSearchResults(results);
+        setSearchResults(results as SearchRow[]);
       } finally {
-        if (searchRequestId.current === requestId) {
-          setIsSearching(false);
-        }
+        if (searchRequestId.current === requestId) setIsSearching(false);
       }
     }, 300);
     return () => {
@@ -595,14 +868,37 @@ function Sessions({
   }, [searchQuery]);
 
   const isShowingSearch = searchQuery.trim().length > 0;
-  const grouped = groupSessions(sessions);
+
+  // ---- derive the visible (non-search) list ----
+  const filtered = useMemo(() => {
+    return sessions.filter((s) => {
+      if (!showArchived && s.archived) return false;
+      if (filterGroup === "all") return true;
+      if (filterGroup === "none") return !s.groupId;
+      return s.groupId === filterGroup;
+    });
+  }, [sessions, showArchived, filterGroup]);
+
+  const pinned = useMemo(
+    () =>
+      filtered
+        .filter((s) => s.pinned)
+        .sort((a, b) => b.startedAt - a.startedAt),
+    [filtered],
+  );
+  const unpinned = useMemo(
+    () => filtered.filter((s) => !s.pinned),
+    [filtered],
+  );
+  const grouped = groupSessions(unpinned);
+
   const visibleSessionIds = useMemo(() => {
     const ids = isShowingSearch
-      ? searchResults.map((result) => result.sessionId)
-      : sessions.map((session) => session.id);
+      ? searchResults.map((r) => r.id)
+      : filtered.map((s) => s.id);
     return Array.from(new Set(ids));
-  }, [isShowingSearch, searchResults, sessions]);
-  const visibleSessionIdKey = visibleSessionIds.join("\u0000");
+  }, [isShowingSearch, searchResults, filtered]);
+  const visibleSessionIdKey = visibleSessionIds.join(" ");
   const selectedCount = selectedSessionIds.size;
   const allVisibleSelected =
     visibleSessionIds.length > 0 &&
@@ -630,13 +926,77 @@ function Sessions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSelectionMode, visibleSessionIdKey]);
 
+  const selectedRows = useCallback(
+    (): SessionRow[] =>
+      sessions.filter((s) => selectedSessionIds.has(s.id)),
+    [sessions, selectedSessionIds],
+  );
+
+  const cardActionProps = {
+    groups,
+    onDelete: handleDelete,
+    onRename: startRename,
+    onPinToggle: handlePinToggle,
+    onPauseResume: handlePauseResume,
+    onMarkComplete: handleMarkComplete,
+    onCopyLink: handleCopyLink,
+    onShare: handleShare,
+    onMoveToGroup: handleMoveToGroup,
+    onNewGroup: handleNewGroup,
+    onArchiveToggle: handleArchiveToggle,
+    selectionMode: isSelectionMode,
+    selectTitle: t("sessions.selectSession"),
+    onToggleSelected: toggleSessionSelected,
+    renameInputRef,
+    onRenameChange: setEditingTitle,
+    onRenameCancel: cancelRename,
+  };
+
+  const renderCard = (s: SessionRow, showFullDate: boolean): React.JSX.Element => (
+    <SessionCard
+      key={s.id}
+      session={s}
+      isActive={currentSessionId === s.id}
+      showFullDate={showFullDate}
+      onClick={() => onResumeSession(s.id, s.profile)}
+      isRenaming={editingSessionId === s.id}
+      renameValue={editingTitle}
+      onRenameConfirm={() => confirmRename(s.id, editingTitle)}
+      selected={selectedSessionIds.has(s.id)}
+      {...cardActionProps}
+    />
+  );
+
   return (
     <div className="sessions-container">
-      {/* Header with integrated search */}
       <div className="sessions-header">
         <div className="sessions-header-top">
           <h2 className="sessions-title">{t("sessions.title")}</h2>
           <div className="sessions-header-actions">
+            <label className="sessions-archived-toggle">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />
+              {t("sessions.showArchived")}
+            </label>
+            {groups.length > 0 && (
+              <select
+                className="sessions-group-filter"
+                value={filterGroup}
+                onChange={(e) => setFilterGroup(e.target.value)}
+                title={t("sessions.filterGroup")}
+              >
+                <option value="all">{t("sessions.allGroups")}</option>
+                <option value="none">{t("sessions.noGroup")}</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               className="btn btn-secondary sessions-select-mode"
@@ -693,9 +1053,7 @@ function Sessions({
             <button
               type="button"
               className="btn btn-danger"
-              onClick={() =>
-                setPendingBulkDeleteIds(Array.from(selectedSessionIds))
-              }
+              onClick={() => setPendingBulkDelete(selectedRows())}
               disabled={selectedCount === 0}
             >
               {t("sessions.deleteSelected")}
@@ -722,151 +1080,24 @@ function Sessions({
           </div>
         ) : (
           <div className="sessions-list">
-            {searchResults.map((r, index) => {
-              const snippetTitle =
-                !r.title && r.snippet
-                  ? cleanSearchSnippet(r.snippet, true)
-                  : "";
-              const fallbackTitle =
-                (r.snippet && cleanSearchSnippet(r.snippet)) ||
-                `${t("sessions.title")} ${r.sessionId.slice(-6)}`;
-              const shouldShowSnippet = Boolean(r.title && r.snippet);
-
-              return (
-                <div
-                  key={`${r.sessionId}-${index}`}
-                  role="button"
-                  tabIndex={0}
-                  className={`sessions-card ${
-                    currentSessionId === r.sessionId
-                      ? "sessions-card--active"
-                      : ""
-                  } ${
-                    selectedSessionIds.has(r.sessionId)
-                      ? "sessions-card--selected"
-                      : ""
-                  }`}
-                  onClick={() => {
-                    if (isSelectionMode) {
-                      toggleSessionSelected(r.sessionId);
-                    } else {
-                      onResumeSession(r.sessionId);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (isSelectionMode) {
-                        toggleSessionSelected(r.sessionId);
-                      } else {
-                        onResumeSession(r.sessionId);
-                      }
-                    }
-                  }}
-                >
-                  <div className="sessions-card-main">
-                    {isSelectionMode && (
-                      <label
-                        className="sessions-card-select"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSessionIds.has(r.sessionId)}
-                          onChange={() => toggleSessionSelected(r.sessionId)}
-                          aria-label={t("sessions.selectSession")}
-                        />
-                      </label>
-                    )}
-                    {editingSessionId === r.sessionId ? (
-                      <input
-                        ref={renameInputRef}
-                        className="sessions-card-rename-input"
-                        type="text"
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            confirmRename(r.sessionId, editingTitle);
-                          } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            cancelRename();
-                          }
-                        }}
-                        onBlur={() => confirmRename(r.sessionId, editingTitle)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span className="sessions-card-title">
-                        {r.title ||
-                          (snippetTitle
-                            ? highlightSnippet(snippetTitle)
-                            : fallbackTitle)}
-                      </span>
-                    )}
-                    <span className="sessions-card-time">
-                      {formatFullDate(r.startedAt)}
-                    </span>
+            {searchResults.map((r) => (
+              <div key={r.id} className="sessions-search-row">
+                {renderCard(r, true)}
+                {r.title && r.snippet && (
+                  <div className="sessions-result-snippet">
+                    {highlightSnippet(r.snippet)}
                   </div>
-                  {shouldShowSnippet && (
-                    <div className="sessions-result-snippet">
-                      {highlightSnippet(r.snippet)}
-                    </div>
-                  )}
-                  <div className="sessions-card-tags">
-                    <span className="sessions-tag sessions-tag--source">
-                      {r.source}
-                    </span>
-                    <span className="sessions-tag">
-                      {r.messageCount}{" "}
-                      {r.messageCount !== 1
-                        ? t("sessions.messages")
-                        : t("sessions.messageSingular")}
-                    </span>
-                    {r.model && (
-                      <span className="sessions-tag sessions-tag--model">
-                        {formatModel(r.model)}
-                      </span>
-                    )}
-                    {!isSelectionMode && editingSessionId !== r.sessionId && (
-                      <button
-                        type="button"
-                        className="sessions-card-rename"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRename(r.sessionId, r.title || "");
-                        }}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        title={t("sessions.rename")}
-                        aria-label={t("sessions.rename")}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    {!isSelectionMode && editingSessionId !== r.sessionId && (
-                      <button
-                        type="button"
-                        className="sessions-card-delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(r.sessionId);
-                        }}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        title={t("sessions.delete")}
-                        aria-label={t("sessions.delete")}
-                      >
-                        <Trash size={14} />
-                      </button>
-                    )}
+                )}
+                {!r.title && r.snippet && (
+                  <div className="sessions-result-snippet">
+                    {cleanSearchSnippet(r.snippet)}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            ))}
           </div>
         )
-      ) : sessions.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="sessions-empty">
           <ChatBubble size={32} className="sessions-empty-icon" />
           <p className="sessions-empty-text">{t("sessions.empty")}</p>
@@ -874,41 +1105,31 @@ function Sessions({
         </div>
       ) : (
         <div className="sessions-list">
+          {pinned.length > 0 && (
+            <div className="sessions-group">
+              <div className="sessions-group-label">
+                {t("sessions.pinnedSection")}
+              </div>
+              {pinned.map((s) => renderCard(s, true))}
+            </div>
+          )}
           {grouped.map((group) => (
             <div key={group.label} className="sessions-group">
               <div className="sessions-group-label">
                 {t(`sessions.${group.label}`)}
               </div>
-              {group.sessions.map((s) => (
-                <SessionCard
-                  key={s.id}
-                  session={s}
-                  isActive={currentSessionId === s.id}
-                  showFullDate={
-                    group.label === "thisWeek" || group.label === "earlier"
-                  }
-                  onClick={() => onResumeSession(s.id)}
-                  onDelete={handleDelete}
-                  deleteTitle={t("sessions.delete")}
-                  onRename={startRename}
-                  renameTitle={t("sessions.rename")}
-                  isRenaming={editingSessionId === s.id}
-                  renameValue={editingTitle}
-                  onRenameChange={setEditingTitle}
-                  onRenameConfirm={() => confirmRename(s.id, editingTitle)}
-                  onRenameCancel={cancelRename}
-                  renameInputRef={renameInputRef}
-                  selectionMode={isSelectionMode}
-                  selected={selectedSessionIds.has(s.id)}
-                  onToggleSelected={toggleSessionSelected}
-                  selectTitle={t("sessions.selectSession")}
-                />
-              ))}
+              {group.sessions.map((s) =>
+                renderCard(
+                  s,
+                  group.label === "thisWeek" || group.label === "earlier",
+                ),
+              )}
             </div>
           ))}
         </div>
       )}
-      {pendingDeleteSessionId && (
+
+      {pendingDelete && (
         <div
           className="sessions-confirm-overlay"
           onClick={cancelDelete}
@@ -929,7 +1150,7 @@ function Sessions({
                 type="button"
                 className="btn-ghost sessions-confirm-close"
                 onClick={cancelDelete}
-                disabled={!!deletingSessionId}
+                disabled={deleting}
                 aria-label={t("sessions.deleteClose")}
               >
                 <X size={16} />
@@ -943,17 +1164,17 @@ function Sessions({
                 type="button"
                 className="btn btn-secondary"
                 onClick={cancelDelete}
-                disabled={!!deletingSessionId}
+                disabled={deleting}
               >
                 {t("sessions.deleteCancel")}
               </button>
               <button
                 type="button"
                 className="btn btn-danger"
-                onClick={() => void confirmDelete(pendingDeleteSessionId)}
-                disabled={!!deletingSessionId}
+                onClick={() => void confirmDelete(pendingDelete)}
+                disabled={deleting}
               >
-                {deletingSessionId
+                {deleting
                   ? t("sessions.deleteDeleting")
                   : t("sessions.deleteConfirmAction")}
               </button>
@@ -961,7 +1182,8 @@ function Sessions({
           </div>
         </div>
       )}
-      {pendingBulkDeleteIds && (
+
+      {pendingBulkDelete && (
         <div
           className="sessions-confirm-overlay"
           onClick={cancelBulkDelete}
@@ -991,7 +1213,7 @@ function Sessions({
             <div className="sessions-confirm-body">
               <p>
                 {t("sessions.deleteSelectedConfirm", {
-                  count: pendingBulkDeleteIds.length,
+                  count: pendingBulkDelete.length,
                 })}
               </p>
             </div>
@@ -1007,7 +1229,7 @@ function Sessions({
               <button
                 type="button"
                 className="btn btn-danger"
-                onClick={() => void confirmBulkDelete(pendingBulkDeleteIds)}
+                onClick={() => void confirmBulkDelete(pendingBulkDelete)}
                 disabled={deletingBulk}
               >
                 {deletingBulk
@@ -1018,6 +1240,8 @@ function Sessions({
           </div>
         </div>
       )}
+
+      {toast && <div className="sessions-toast">{toast}</div>}
     </div>
   );
 }
