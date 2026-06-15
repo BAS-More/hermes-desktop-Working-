@@ -9768,3 +9768,162 @@ body {
   background: transparent; border: none; color: #61afef; font-weight: 700;
   cursor: pointer; font-size: 13px;
 }
+
+/* ---- In-chat Factory panel (a right-hand column, like .worktree-panel) ---- */
+.factory-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.factory-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+.factory-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.factory-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+.factory-panel-close:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+.factory-panel-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.factory-panel-mode-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.factory-panel-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.factory-panel-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.factory-panel-switch-knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all var(--transition);
+}
+.factory-panel-switch.on {
+  background: rgba(152, 195, 121, 0.18);
+  color: #98c379;
+  border-color: #98c379;
+}
+.factory-panel-switch.on .factory-panel-switch-knob {
+  background: #98c379;
+}
+.factory-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+.factory-panel-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.factory-panel-builds {
+  display: grid;
+  gap: 10px;
+}
+.factory-panel-build {
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.factory-panel-build-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.factory-panel-build-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.factory-linkbtn {
+  font-weight: 600;
+  font-size: 13px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #61afef;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.factory-panel-build-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.factory-panel-build-escalation {
+  font-size: 12px;
+  color: #e06c75;
+  margin-top: 6px;
+}
+.factory-panel-notice {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+.factory-panel-error {
+  font-size: 12px;
+  color: #e06c75;
+  padding: 4px 0;
+}

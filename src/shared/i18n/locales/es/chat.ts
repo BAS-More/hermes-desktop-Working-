@@ -118,4 +118,19 @@ export default {
   },
   showWorktree: "Mostrar explorador de archivos",
   hideWorktree: "Ocultar explorador de archivos",
+  factory: {
+    chip: "Fábrica",
+    show: "Mostrar la fábrica — activa el modo de construcción autónoma",
+    hide: "Ocultar el panel de la fábrica",
+    panelTitle: "Fábrica",
+    close: "Cerrar",
+    mode: "Modo fábrica",
+    on: "Activado",
+    off: "Desactivado",
+    builds: "Compilaciones activas",
+    noBuilds: "No hay compilaciones activas.",
+    loading: "Cargando estado de la fábrica…",
+    unsupported:
+      "La fábrica requiere una instalación local de Hermes o un túnel SSH.",
+  },
 } as const;

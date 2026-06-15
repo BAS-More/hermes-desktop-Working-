@@ -84,4 +84,18 @@ export default {
     openTerminal: "在此处打开终端",
     openTerminalFailed: "无法为此文件夹打开终端。",
   },
+  factory: {
+    chip: "工厂",
+    show: "显示工厂 — 启用自主构建模式",
+    hide: "隐藏工厂面板",
+    panelTitle: "工厂",
+    close: "关闭",
+    mode: "工厂模式",
+    on: "开",
+    off: "关",
+    builds: "进行中的构建",
+    noBuilds: "暂无进行中的构建。",
+    loading: "正在加载工厂状态…",
+    unsupported: "工厂需要本地 Hermes 安装或 SSH 隧道。",
+  },
 } as const;
