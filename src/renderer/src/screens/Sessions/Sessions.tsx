@@ -158,8 +158,8 @@ function ProfileChip({ profile }: { profile: string }): React.JSX.Element {
     <span
       className="sessions-tag sessions-tag--profile"
       style={{
-        borderColor: color,
-        color,
+        backgroundColor: color,
+        color: "#fff",
       }}
       title={profile}
     >
@@ -520,7 +520,9 @@ function Sessions({
   const [isSearching, setIsSearching] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [filterGroup, setFilterGroup] = useState<string>("all");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(
+    null,
+  );
   const [pendingDelete, setPendingDelete] = useState<SessionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -545,10 +547,11 @@ function Sessions({
     editingSessionIdRef.current = editingSessionId;
   }, [editingSessionId]);
 
-  const showToast = useCallback((msg: string): void => {
+  const showToast = useCallback((msg: string, undo?: () => void): void => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(msg);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    setToast({ msg, undo });
+    // Longer dwell when an Undo is offered, so the user can actually catch it.
+    toastTimer.current = setTimeout(() => setToast(null), undo ? 6000 : 4000);
   }, []);
 
   const sessionById = useCallback(
@@ -618,18 +621,33 @@ function Sessions({
 
   const handleMarkComplete = useCallback(
     (s: SessionRow): void => {
+      const prev = s.status;
       patchSession(s.id, { status: "complete" });
       void window.hermesAPI.setSessionStatus(s.profile, s.id, "complete");
+      showToast(t("sessions.actions.markedComplete"), () => {
+        patchSession(s.id, { status: prev });
+        void window.hermesAPI.setSessionStatus(s.profile, s.id, prev);
+      });
     },
-    [patchSession],
+    [patchSession, showToast, t],
   );
 
   const handleArchiveToggle = useCallback(
     (s: SessionRow): void => {
-      patchSession(s.id, { archived: !s.archived });
-      void window.hermesAPI.setSessionArchived(s.profile, s.id, !s.archived);
+      const next = !s.archived;
+      patchSession(s.id, { archived: next });
+      void window.hermesAPI.setSessionArchived(s.profile, s.id, next);
+      // Archiving removes the card from the default view — always offer Undo so
+      // it never feels like a session "disappeared". Unarchiving is benign, no
+      // toast needed.
+      if (next) {
+        showToast(t("sessions.actions.archived"), () => {
+          patchSession(s.id, { archived: false });
+          void window.hermesAPI.setSessionArchived(s.profile, s.id, false);
+        });
+      }
     },
-    [patchSession],
+    [patchSession, showToast, t],
   );
 
   const sessionLink = (s: SessionRow): string =>
@@ -986,6 +1004,7 @@ function Sessions({
                 className="sessions-group-filter"
                 value={filterGroup}
                 onChange={(e) => setFilterGroup(e.target.value)}
+                aria-label={t("sessions.filterGroup")}
                 title={t("sessions.filterGroup")}
               >
                 <option value="all">{t("sessions.allGroups")}</option>
@@ -1025,7 +1044,9 @@ function Sessions({
           />
           {searchQuery && (
             <button
+              type="button"
               className="btn-ghost sessions-searchbar-clear"
+              aria-label={t("sessions.clearSearch")}
               onClick={() => {
                 setSearchQuery("");
                 searchRef.current?.focus();
@@ -1080,19 +1101,36 @@ function Sessions({
           </div>
         ) : (
           <div className="sessions-list">
-            {searchResults.map((r) => (
-              <div key={r.id} className="sessions-search-row">
-                {renderCard(r, true)}
-                {r.title && r.snippet && (
-                  <div className="sessions-result-snippet">
-                    {highlightSnippet(r.snippet)}
-                  </div>
-                )}
-                {!r.title && r.snippet && (
-                  <div className="sessions-result-snippet">
-                    {cleanSearchSnippet(r.snippet)}
-                  </div>
-                )}
+            <div
+              className="sessions-result-count"
+              role="status"
+              aria-live="polite"
+            >
+              {t("sessions.resultCount", { count: searchResults.length })}
+            </div>
+            {groupSessions(searchResults).map((group) => (
+              <div key={group.label} className="sessions-group">
+                <div className="sessions-group-label">
+                  {t(`sessions.${group.label}`)}
+                </div>
+                {group.sessions.map((s) => {
+                  const r = s as SearchRow;
+                  return (
+                    <div key={r.id} className="sessions-search-row">
+                      {renderCard(r, true)}
+                      {r.title && r.snippet && (
+                        <div className="sessions-result-snippet">
+                          {highlightSnippet(r.snippet)}
+                        </div>
+                      )}
+                      {!r.title && r.snippet && (
+                        <div className="sessions-result-snippet">
+                          {cleanSearchSnippet(r.snippet)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -1241,7 +1279,23 @@ function Sessions({
         </div>
       )}
 
-      {toast && <div className="sessions-toast">{toast}</div>}
+      {toast && (
+        <div className="sessions-toast" role="status" aria-live="polite">
+          <span>{toast.msg}</span>
+          {toast.undo && (
+            <button
+              type="button"
+              className="sessions-toast-undo"
+              onClick={() => {
+                toast.undo?.();
+                setToast(null);
+              }}
+            >
+              {t("sessions.actions.undo")}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
