@@ -22,6 +22,8 @@ export default {
   deleteConfirmAction: "删除",
   deleteDeleting: "正在删除...",
   pinnedSection: "已置顶",
+  clearSearch: "清除搜索",
+  resultCount_other: "{{count}} 个结果",
   showArchived: "显示已归档",
   hideArchived: "隐藏已归档",
   archivedSection: "已归档",
@@ -47,6 +49,9 @@ export default {
     pause: "暂停",
     resume: "继续",
     linkCopied: "链接已复制到剪贴板",
+    undo: "撤销",
+    archived: "会话已归档",
+    markedComplete: "已标记为完成",
   },
   status: {
     active: "进行中",
