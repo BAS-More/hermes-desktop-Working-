@@ -135,8 +135,11 @@ describe("Agents profile creation", () => {
       expect(screen.getByText("test2")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByTitle("agents.deleteTitle"));
-    fireEvent.click(screen.getByText("agents.yes"));
+    // Open test2's profile modal (default card is first, test2 second).
+    fireEvent.click(screen.getAllByTitle("agents.editAppearance")[1]);
+    // Danger zone: reveal confirm, then confirm the delete.
+    fireEvent.click(screen.getByText("agents.deleteProfile"));
+    fireEvent.click(screen.getByText("agents.deleteProfile"));
 
     expect(screen.queryByText("test2")).toBeNull();
 
@@ -174,12 +177,15 @@ describe("Agents profile creation", () => {
       expect(screen.getByText("test2")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByTitle("agents.deleteTitle"));
-    fireEvent.click(screen.getByText("agents.yes"));
+    fireEvent.click(screen.getAllByTitle("agents.editAppearance")[1]);
+    fireEvent.click(screen.getByText("agents.deleteProfile"));
+    fireEvent.click(screen.getByText("agents.deleteProfile"));
 
     await waitFor(() => {
       expect(screen.getByText("test2")).toBeTruthy();
     });
-    expect(screen.getByText("Profile delete failed")).toBeTruthy();
+    expect(screen.getAllByText("Profile delete failed").length).toBeGreaterThan(
+      0,
+    );
   });
 });

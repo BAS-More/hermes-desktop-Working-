@@ -8,6 +8,7 @@ export default {
   quickAskTitle:
     "Quick Ask (/btw) — side question that won't affect conversation context",
   send: "Send",
+  searchModels: "Search models...",
   custom: "Custom",
   typeModelName: "Type model name...",
   reasoningEffort: {
@@ -38,6 +39,14 @@ export default {
   suggestionAnalyze: "Analyze data",
   approve: "Approve",
   deny: "Deny",
+  clarify: {
+    defaultQuestion: "Hermes needs your input.",
+    placeholder: "Type your answer…  (Ctrl+Enter to send)",
+    send: "Send",
+    skip: "Skip — let Hermes decide",
+    skipped: "Skipped — Hermes decided",
+    error: "Couldn't deliver your answer — the turn may have ended. Try again.",
+  },
   thinking: "Thinking…",
   thought: "Thought",
   toolCall: "Tool call",
@@ -120,6 +129,9 @@ export default {
     version: "Show Hermes version",
   },
   queued: "{{count}} message(s) queued — will send when the agent finishes",
+  queuedCount: "{{count}} queued",
+  queuedAttachment: "{{count}} attachment(s)",
+  queuedCancel: "Remove from queue",
   worktree: {
     loading: "Loading",
     empty: "Folder is empty",

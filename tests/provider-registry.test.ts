@@ -19,6 +19,9 @@ describe("provider-registry", () => {
       expect(canonicalProviderBaseUrl("xiaomi")).toBe(
         "https://api.xiaomimimo.com/v1",
       );
+      expect(canonicalProviderBaseUrl("aimlapi")).toBe(
+        "https://api.aimlapi.com/v1",
+      );
       expect(canonicalProviderBaseUrl("together")).toBe(
         "https://api.together.xyz/v1",
       );
@@ -39,6 +42,9 @@ describe("provider-registry", () => {
       );
       expect(canonicalProviderBaseUrl("openrouter")).toBe(
         "https://openrouter.ai/api/v1",
+      );
+      expect(canonicalProviderBaseUrl("ollama-cloud")).toBe(
+        "https://ollama.com/v1",
       );
     });
 
@@ -88,12 +94,14 @@ describe("provider-registry", () => {
       // prevent.
       const requiredBuiltins = [
         "groq",
+        "aimlapi",
         "deepseek",
         "together",
         "fireworks",
         "cerebras",
         "mistral",
         "xiaomi",
+        "ollama-cloud",
       ];
       for (const provider of requiredBuiltins) {
         expect(PROVIDER_BASE_URLS[provider]).toBeTruthy();

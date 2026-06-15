@@ -69,5 +69,5 @@ rpm:
 npmRebuild: false
 publish:
   provider: github
-  owner: fathah
-  repo: hermes-desktop
+  owner: BAS-More
+  repo: hermes-desktop-Working-

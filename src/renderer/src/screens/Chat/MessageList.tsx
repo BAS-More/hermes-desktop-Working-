@@ -1,7 +1,13 @@
 import { memo, useMemo } from "react";
 import { HermesAvatar, MessageRow } from "./MessageRow";
 import { ReasoningRow, ToolActivityGroup } from "./HistoryRow";
-import type { ChatMessage, ToolCallMessage, ToolResultMessage } from "./types";
+import { ClarifyCard } from "./ClarifyCard";
+import type {
+  ChatMessage,
+  ClarifyMessage,
+  ToolCallMessage,
+  ToolResultMessage,
+} from "./types";
 
 function isToolRow(m: ChatMessage): m is ToolCallMessage | ToolResultMessage {
   const k = (m as { kind?: string }).kind;
@@ -14,6 +20,8 @@ interface MessageListProps {
   toolProgress: string | null;
   onApprove: () => void;
   onDeny: () => void;
+  /** Mark an inline clarify card resolved once the user answers/skips. */
+  onClarifyResolved: (requestId: string, answer: string) => void;
 }
 
 function TypingIndicator({
@@ -57,6 +65,7 @@ export const MessageList = memo(function MessageList({
   toolProgress,
   onApprove,
   onDeny,
+  onClarifyResolved,
 }: MessageListProps): React.JSX.Element {
   // Bubbles with empty content are still hidden (live-stream placeholders).
   // History rows pass through unconditionally.
@@ -119,6 +128,17 @@ export const MessageList = memo(function MessageList({
           // a completed "Thought".
           active={isLoading && i === visibleMessages.length - 1}
           showAvatar={showAvatar}
+        />,
+      );
+      continue;
+    }
+
+    if (k === "clarify") {
+      rows.push(
+        <ClarifyCard
+          key={msg.id}
+          msg={msg as ClarifyMessage}
+          onResolved={onClarifyResolved}
         />,
       );
       continue;

@@ -1,0 +1,99 @@
+name: Mac DMG (unsigned, on-demand)
+
+# One-shot, manually-triggered build of an UNSIGNED macOS .dmg on GitHub's
+# hosted macOS runners. Unlike release.yml's release_mac job, this needs NO
+# Apple secrets (no notarization, no code-signing) and publishes nothing — it
+# just uploads the .dmg as a workflow artifact for download.
+#
+# Gatekeeper note: because the result is unsigned + un-notarized, on first launch
+# macOS will block it. The user opens it once via right-click -> Open, or runs:
+#   xattr -dr com.apple.quarantine "/Applications/Hermes One.app"
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Target architecture"
+        type: choice
+        options:
+          - both
+          - arm64
+          - x64
+        default: both
+
+jobs:
+  build:
+    name: Build macOS DMG (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Build both by default; the if-guard skips the arch the user didn't pick.
+        arch: [arm64, x64]
+    steps:
+      - name: Skip unselected arch
+        id: gate
+        run: |
+          want='${{ github.event.inputs.arch }}'
+          if [ "$want" = "both" ] || [ "$want" = "${{ matrix.arch }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping ${{ matrix.arch }} (user selected $want)"
+          fi
+
+      - name: Check out repository
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: npm ci
+
+      - name: Rebuild native dependencies for target arch
+        if: steps.gate.outputs.run == 'true'
+        run: npx electron-builder install-app-deps --arch=${{ matrix.arch }}
+
+      - name: Build app
+        if: steps.gate.outputs.run == 'true'
+        run: npm run build
+
+      - name: Package UNSIGNED macOS DMG
+        if: steps.gate.outputs.run == 'true'
+        env:
+          # Force-disable code discovery so electron-builder does not try to sign.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: >-
+          npx electron-builder --mac dmg --${{ matrix.arch }}
+          --publish never
+          -c.mac.notarize=false
+          -c.mac.identity=null
+
+      - name: Verify native module architecture
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          NODE_FILE="dist/mac-${{ matrix.arch }}/Hermes One.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          if [ ! -f "$NODE_FILE" ]; then
+            NODE_FILE="dist/mac/Hermes One.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          fi
+          file "$NODE_FILE"
+          case "${{ matrix.arch }}" in
+            x64) file "$NODE_FILE" | grep -q "x86_64" ;;
+            arm64) file "$NODE_FILE" | grep -q "arm64" ;;
+          esac
+
+      - name: Upload DMG artifact
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-mac-${{ matrix.arch }}-dmg
+          path: dist/*.dmg
+          if-no-files-found: error

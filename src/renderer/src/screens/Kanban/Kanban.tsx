@@ -637,7 +637,7 @@ function Kanban({ profile, visible, focusTaskId, onFocusHandled }: KanbanProps):
               }`}
               onClick={() => handleBoardSwitch(HQ_BOARD_SLUG)}
               disabled={actionBusy === "board-switch"}
-              title="Claw3D headquarters board (read-only mirror)"
+              title={t("kanban.hqBoardTooltip")}
             >
               {isHqActive && <span className="kanban-board-dot" />}
               <span>HQ (Claw3D)</span>
@@ -664,7 +664,7 @@ function Kanban({ profile, visible, focusTaskId, onFocusHandled }: KanbanProps):
           {error}
           <button
             className="btn-ghost"
-            title="Dismiss error"
+            title={t("kanban.dismissError")}
             onClick={() => setError("")}
           >
             <X size={14} />
@@ -1090,7 +1090,7 @@ function Kanban({ profile, visible, focusTaskId, onFocusHandled }: KanbanProps):
               </span>
               <button
                 className="btn-ghost"
-                title="Close task details"
+                title={t("kanban.closeTaskDetails")}
                 onClick={() => setDetailTaskId(null)}
               >
                 <X size={14} />
