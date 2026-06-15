@@ -7,6 +7,9 @@ import { ModelPicker } from "./ModelPicker";
 import { ReasoningEffortPicker } from "./ReasoningEffortPicker";
 import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
+import { FactoryToggle } from "./FactoryToggle";
+import { FactoryPanel } from "./FactoryPanel";
+import { useFactoryStatus } from "./hooks/useFactoryStatus";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
 import { useChatActions } from "./hooks/useChatActions";
@@ -62,6 +65,10 @@ function Chat({
   const [contextFolder, setContextFolder] = useState<string | null>(null);
   // Whether the worktree panel is visible (only applies when contextFolder is set)
   const [worktreeVisible, setWorktreeVisible] = useState<boolean>(true);
+  // In-chat Factory panel. Closed by default; opening it also enables the
+  // orchestrator closed-loop ("factory mode"). Hidden in remote mode.
+  const [factoryVisible, setFactoryVisible] = useState<boolean>(false);
+  const factory = useFactoryStatus(factoryVisible && !remoteMode);
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const queueRef = useRef<QueuedMessage[]>([]);
@@ -386,6 +393,18 @@ function Chat({
         {contextFolder && worktreeVisible && (
           <WorktreePanel folderPath={contextFolder} />
         )}
+
+        {factoryVisible && !remoteMode && (
+          <FactoryPanel
+            status={factory.status}
+            loading={factory.loading}
+            error={factory.error}
+            unsupported={factory.unsupported}
+            loopOn={factory.loopOn}
+            setLoop={factory.setLoop}
+            onClose={() => setFactoryVisible(false)}
+          />
+        )}
       </div>
 
       {queuedCount > 0 && (
@@ -428,6 +447,18 @@ function Chat({
                 onPickFolder={handlePickFolder}
                 onClearFolder={handleClearFolder}
                 onToggleWorktree={() => setWorktreeVisible((v) => !v)}
+              />
+              <FactoryToggle
+                show={!remoteMode}
+                active={factoryVisible}
+                onToggle={() => {
+                  setFactoryVisible((open) => {
+                    const next = !open;
+                    // Opening = "activate factory": enable the loop if it's off.
+                    if (next && !factory.loopOn) void factory.setLoop(true);
+                    return next;
+                  });
+                }}
               />
             </>
           }

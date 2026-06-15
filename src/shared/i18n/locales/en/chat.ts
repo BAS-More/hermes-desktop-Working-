@@ -135,4 +135,18 @@ export default {
   },
   showWorktree: "Show file explorer",
   hideWorktree: "Hide file explorer",
+  factory: {
+    chip: "Factory",
+    show: "Show the factory — enables autonomous build mode",
+    hide: "Hide the factory panel",
+    panelTitle: "Factory",
+    close: "Close",
+    mode: "Factory mode",
+    on: "On",
+    off: "Off",
+    builds: "Active builds",
+    noBuilds: "No active builds.",
+    loading: "Loading factory status…",
+    unsupported: "The factory requires a local Hermes install or SSH tunnel.",
+  },
 } as const;
