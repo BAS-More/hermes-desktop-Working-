@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 // Mock every config dependency the audit checks touch. The tests then
 // directly call runConfigHealthCheck (the entry point the renderer hits
@@ -49,6 +52,27 @@ let FAKE_VAULT: Record<string, string> = {};
 // the .env overlay was silently skipped — which is exactly what let the
 // vault-wins precedence inversion hide (AIR-008). A precedence test sets this.
 let FAKE_ENV: Record<string, string> = {};
+const ENV_KEYS = [
+  "API_SERVER_KEY",
+  "NANO_GPT_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_TOKEN",
+  "CUSTOM_API_KEY",
+  "OPENAI_API_KEY",
+] as const;
+const ORIGINAL_ENV = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
+const TEST_HOME = join(tmpdir(), "hermes-config-health-unit");
+
+vi.mock("./installer", () => ({
+  HERMES_HOME: "/tmp/hermes-config-health-unit",
+  expectedEnvKeyForModel: (provider: string, baseUrl?: string) => {
+    if (provider === "anthropic") return "ANTHROPIC_API_KEY";
+    if (provider === "custom" && String(baseUrl).includes("api.openai.com")) {
+      return "OPENAI_API_KEY";
+    }
+    return null;
+  },
+}));
 
 vi.mock("./secrets", async () => {
   const actual = await vi.importActual<typeof import("./secrets")>("./secrets");
@@ -131,20 +155,26 @@ describe("config-health audit — vault awareness", () => {
     });
     mockedCustomEndpointKeyResolvable.mockReturnValue(false);
     mockedHasOAuthCredentials.mockReturnValue(false);
+
+    for (const key of ENV_KEYS) {
+      delete process.env[key];
+    }
+
+    mkdirSync(TEST_HOME, { recursive: true });
+    writeFileSync(join(TEST_HOME, "config.yaml"), "");
+    writeFileSync(join(TEST_HOME, ".env"), "");
   });
 
   afterEach(() => {
-    // Don't leak process.env from one test to the next.
-    for (const k of [
-      "API_SERVER_KEY",
-      "NANO_GPT_API_KEY",
-      "ANTHROPIC_API_KEY",
-      "ANTHROPIC_TOKEN",
-      "CUSTOM_API_KEY",
-      "OPENAI_API_KEY",
-    ]) {
-      delete process.env[k];
+    // Don't leak process.env from one test to the next, and restore any
+    // ambient runner values so the file is hermetic on CI.
+    for (const key of ENV_KEYS) {
+      const original = ORIGINAL_ENV.get(key);
+      if (original == null) delete process.env[key];
+      else process.env[key] = original;
     }
+
+    rmSync(TEST_HOME, { recursive: true, force: true });
   });
 
   describe("env provider (default) — byte-for-byte unchanged", () => {
