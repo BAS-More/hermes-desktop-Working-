@@ -73,6 +73,7 @@ function installHermesAPI(
     setSessionArchived: vi.fn().mockResolvedValue(undefined),
     moveSessionToGroup: vi.fn().mockResolvedValue(undefined),
     renameSession: vi.fn().mockResolvedValue(undefined),
+    createSessionGroup: vi.fn().mockResolvedValue(null),
   };
   Object.defineProperty(window, "hermesAPI", {
     configurable: true,
@@ -440,5 +441,129 @@ describe("Sessions tab — multi-profile aggregation", () => {
     await clickCardMenuItem("sessions.actions.pin");
 
     expect(api.setSessionPinned).toHaveBeenCalledWith("architect", "s1", true);
+  });
+});
+
+describe("Sessions tab — a11y structural (Tier 3)", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("opening the menu moves focus to the first menuitem", async () => {
+    installHermesAPI([agg({ id: "s1", profile: "architect", title: "Chat" })]);
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+
+    const menuBtn = screen.getAllByRole("button", {
+      name: "sessions.actions.menu",
+    })[0];
+    await act(async () => {
+      fireEvent.click(menuBtn);
+    });
+
+    const items = screen.getAllByRole("menuitem");
+    // First item is focused and is the only one in the tab sequence.
+    expect(document.activeElement).toBe(items[0]);
+    expect(items[0]).toHaveAttribute("tabindex", "0");
+    expect(items[1]).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("ArrowDown roves the active menu item", async () => {
+    installHermesAPI([agg({ id: "s1", profile: "architect", title: "Chat" })]);
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+
+    const menuBtn = screen.getAllByRole("button", {
+      name: "sessions.actions.menu",
+    })[0];
+    await act(async () => {
+      fireEvent.click(menuBtn);
+    });
+    const menu = screen.getByRole("menu");
+    await act(async () => {
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+    });
+
+    const items = screen.getAllByRole("menuitem");
+    expect(document.activeElement).toBe(items[1]);
+  });
+
+  it("Escape closes the menu and returns focus to the trigger", async () => {
+    installHermesAPI([agg({ id: "s1", profile: "architect", title: "Chat" })]);
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+
+    const menuBtn = screen.getAllByRole("button", {
+      name: "sessions.actions.menu",
+    })[0];
+    await act(async () => {
+      fireEvent.click(menuBtn);
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    });
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(menuBtn);
+  });
+
+  it("the card row is no longer a button and exposes a real Open button", async () => {
+    installHermesAPI([agg({ id: "s1", profile: "architect", title: "Open me" })]);
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+
+    // The open affordance is a button labelled "Open <title>".
+    expect(
+      screen.getByRole("button", { name: "Open Open me" }),
+    ).toBeInTheDocument();
+  });
+
+  it("New group opens a styled modal (not window.prompt) and creates via API", async () => {
+    const api = installHermesAPI([
+      agg({ id: "s1", profile: "architect", title: "Chat" }),
+    ]);
+    api.createSessionGroup.mockResolvedValue({
+      id: "g1",
+      name: "Migration",
+      color: null,
+      sortOrder: 1,
+      createdAt: 0,
+      profile: "architect",
+    });
+    const promptSpy = vi.fn();
+    // If the code still used window.prompt, this would be called — assert it isn't.
+    vi.stubGlobal("prompt", promptSpy);
+
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /sessions\.newGroup/ }),
+      );
+    });
+
+    // A dialog appears with a text input — not a native prompt.
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(promptSpy).not.toHaveBeenCalled();
+
+    const input = dialog.querySelector(
+      "input",
+    ) as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "Migration" } });
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "sessions.newGroupCreate" }),
+      );
+    });
+
+    expect(api.createSessionGroup).toHaveBeenCalledWith(
+      "architect",
+      "Migration",
+    );
+    vi.unstubAllGlobals();
   });
 });

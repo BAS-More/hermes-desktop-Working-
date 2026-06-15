@@ -31,7 +31,10 @@ export default {
   allGroups: "所有分组",
   noGroup: "未分组",
   newGroup: "新建分组…",
+  newGroupTitle: "新建分组",
   newGroupPrompt: "新分组的名称：",
+  newGroupPlaceholder: "例如：迁移",
+  newGroupCreate: "创建分组",
   deleteGroup: "删除分组",
   deleteGroupConfirm: "删除此分组？其中的会话将移回“未分组”。",
   actions: {

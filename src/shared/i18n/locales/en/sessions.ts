@@ -45,7 +45,10 @@ export default {
   allGroups: "All groups",
   noGroup: "Ungrouped",
   newGroup: "New group…",
+  newGroupTitle: "New group",
   newGroupPrompt: "Name for the new group:",
+  newGroupPlaceholder: "e.g. Migration",
+  newGroupCreate: "Create group",
   deleteGroup: "Delete group",
   deleteGroupConfirm:
     "Delete this group? Sessions in it will be moved back to Ungrouped.",

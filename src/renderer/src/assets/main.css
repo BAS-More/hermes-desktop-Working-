@@ -7224,15 +7224,71 @@ body {
   color: var(--danger, #e06c75) !important;
 }
 
-.sessions-menu-popover--sub {
-  position: absolute;
-  right: 100%;
-  top: 0;
-  margin-right: 4px;
+/* Active (DOM-focused) menu item — visible focus inside the popover. */
+.sessions-menu-popover button[role="menuitem"]:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
 }
 
-.sessions-menu-sub {
-  position: relative;
+/* Reset the <ul role="list"> wrapping the cards — no bullets, just a block. */
+.sessions-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* The card's title is now a real <button> (the "open this session"
+   affordance), not a div-with-role. Sized to fill the row, transparent so the
+   card's own background shows through, focus ring on keyboard nav. */
+.sessions-card-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.sessions-card-open:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* In selection mode the title button acts like a toggle for the row. */
+.sessions-card-open--select[aria-pressed="true"] {
+  color: var(--text-primary);
+}
+
+/* New-group modal input/label styling. Reuses the rename-input pattern. */
+.sessions-newgroup-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.sessions-newgroup-input {
+  width: 100%;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  outline: none;
+  font-family: var(--font-sans);
+}
+
+.sessions-newgroup-input:focus-visible {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 30%, transparent);
 }
 
 .sessions-toast {
