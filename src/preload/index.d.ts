@@ -5,6 +5,7 @@ import type {
   RegistryItem,
   RegistryCatalog,
   RegistryDetail,
+  ModelRegistry,
 } from "../shared/registry";
 import type {
   MessagingPlatformsResponse,
@@ -329,6 +330,17 @@ interface HermesAPI {
   getModelConfig: (
     profile?: string,
   ) => Promise<{ provider: string; model: string; baseUrl: string }>;
+  getAuxiliaryConfig: (
+    profile?: string,
+  ) => Promise<
+    { task: string; provider: string; model: string; baseUrl: string }[]
+  >;
+  setAuxiliaryTask: (
+    task: string,
+    cfg: { provider: string; model: string; baseUrl: string },
+    profile?: string,
+  ) => Promise<boolean>;
+  resetAuxiliaryConfig: (profile?: string) => Promise<boolean>;
   setModelConfig: (
     provider: string,
     model: string,
@@ -386,8 +398,9 @@ interface HermesAPI {
     history?: Array<{ role: string; content: string }>,
     attachments?: Attachment[],
     contextFolder?: string,
+    runId?: string,
   ) => Promise<{ response: string; sessionId?: string }>;
-  abortChat: () => Promise<void>;
+  abortChat: (runId?: string) => Promise<void>;
   transcribeAudio: (
     audio: Uint8Array,
     mimeType: string,
@@ -429,24 +442,52 @@ interface HermesAPI {
     /** Subset of `models` flagged as free (Nous Portal today). #367. */
     freeModels?: string[];
   }>;
-  onChatChunk: (callback: (chunk: string) => void) => () => void;
-  onChatReasoningChunk: (callback: (chunk: string) => void) => () => void;
-  onChatDone: (callback: (sessionId?: string) => void) => () => void;
-  onChatToolProgress: (callback: (tool: string) => void) => () => void;
-  onChatToolEvent: (callback: (event: ChatToolEvent) => void) => () => void;
-  onChatUsage: (
-    callback: (usage: {
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens: number;
-      cost?: number;
-      rateLimitRemaining?: number;
-      rateLimitReset?: number;
-      cacheReadTokens?: number;
-      cacheWriteTokens?: number;
-    }) => void,
+  getModelContextWindow: (
+    provider: string,
+    model: string,
+    baseUrl?: string,
+    profile?: string,
+  ) => Promise<number | null>;
+  onChatChunk: (callback: (runId: string, chunk: string) => void) => () => void;
+  onChatReasoningChunk: (
+    callback: (runId: string, chunk: string) => void,
   ) => () => void;
-  onChatError: (callback: (error: string) => void) => () => void;
+  onChatDone: (
+    callback: (runId: string, sessionId?: string) => void,
+  ) => () => void;
+  onChatToolProgress: (
+    callback: (runId: string, tool: string) => void,
+  ) => () => void;
+  onChatToolEvent: (
+    callback: (runId: string, event: ChatToolEvent) => void,
+  ) => () => void;
+  onChatUsage: (
+    callback: (
+      runId: string,
+      usage: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        cost?: number;
+        rateLimitRemaining?: number;
+        rateLimitReset?: number;
+        cacheReadTokens?: number;
+        cacheWriteTokens?: number;
+      },
+    ) => void,
+  ) => () => void;
+  onChatError: (callback: (runId: string, error: string) => void) => () => void;
+  onClarifyRequest: (
+    callback: (
+      runId: string,
+      req: {
+        requestId: string;
+        question: string;
+        choices: string[];
+      },
+    ) => void,
+  ) => () => void;
+  respondClarify: (requestId: string, answer: string) => Promise<boolean>;
 
   // Gateway
   startGateway: () => Promise<GatewayStartResult>;
@@ -461,7 +502,9 @@ interface HermesAPI {
     enabled: boolean,
     profile?: string,
   ) => Promise<boolean>;
-  getMessagingPlatforms: (profile?: string) => Promise<MessagingPlatformsResponse>;
+  getMessagingPlatforms: (
+    profile?: string,
+  ) => Promise<MessagingPlatformsResponse>;
   updateMessagingPlatform: (
     platform: string,
     update: MessagingPlatformUpdate,
@@ -545,6 +588,10 @@ interface HermesAPI {
       hasSoul: boolean;
       skillCount: number;
       gatewayRunning: boolean;
+      /** Resolved accent colour; absent on SSH/remote profiles. */
+      color?: string;
+      /** Avatar data URL, or null/absent when none is set. */
+      avatar?: string | null;
     }>
   >;
   createProfile: (
@@ -555,6 +602,17 @@ interface HermesAPI {
     name: string,
   ) => Promise<{ success: boolean; error?: string }>;
   setActiveProfile: (name: string) => Promise<boolean>;
+  setProfileColor: (
+    name: string,
+    color: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  setProfileAvatar: (
+    name: string,
+    dataUrl: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  removeProfileAvatar: (
+    name: string,
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Memory
   readMemory: (profile?: string) => Promise<{
@@ -682,6 +740,7 @@ interface HermesAPI {
     label: string,
     profile?: string,
   ) => Promise<Array<CredentialPoolEntry>>;
+  invalidateSecretsCache: () => Promise<void>;
 
   // Models
   listModels: () => Promise<
@@ -965,9 +1024,7 @@ interface HermesAPI {
   >;
 
   // MCP servers
-  listMcpServers: (
-    profile?: string,
-  ) => Promise<
+  listMcpServers: (profile?: string) => Promise<
     Array<{
       name: string;
       type: "http" | "stdio" | "unknown";
@@ -1041,6 +1098,7 @@ interface HermesAPI {
   fetchRegistry: (
     force?: boolean,
   ) => Promise<RegistryCatalog & { error?: string }>;
+  fetchModelRegistry: (force?: boolean) => Promise<ModelRegistry>;
   listInstalledRegistry: (
     profile?: string,
   ) => Promise<{ skills: string[]; mcps: string[]; workflows: string[] }>;

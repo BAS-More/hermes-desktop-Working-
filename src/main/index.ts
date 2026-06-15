@@ -10,6 +10,7 @@ import {
   session,
 } from "electron";
 import { join, extname } from "path";
+import { randomUUID } from "crypto";
 import { readdir, readFile, stat } from "fs/promises";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import type { AppUpdater } from "electron-updater";
@@ -17,7 +18,10 @@ import icon from "../../resources/icon.png?asset";
 import type { Attachment } from "../shared/attachments";
 import { stageAttachment, clearStagedAttachments } from "./attachment-staging";
 import { persistPromptImageAttachments } from "./session-attachment-store";
-import { discoverProviderModels } from "./model-discovery";
+import {
+  discoverProviderModels,
+  getModelContextWindow,
+} from "./model-discovery";
 import {
   cleanupTempMediaFiles,
   materializeDataUrlToTemp,
@@ -80,6 +84,7 @@ import {
   ensureSshTunnelIfNeeded,
   setSshRemoteApiKey,
   getRemoteAuthHeader,
+  resolvePendingClarify,
 } from "./hermes";
 import {
   startSshTunnel,
@@ -123,8 +128,14 @@ import {
   setConnectionConfig,
   getPlatformEnabled,
   setPlatformEnabled,
-  getApiServerKey,
+  getApiServerKeyStatus,
+  invalidateSecretsCache,
 } from "./config";
+import {
+  getAuxiliaryConfig,
+  setAuxiliaryTask,
+  resetAuxiliaryToAuto,
+} from "./auxiliary-config";
 import {
   listSessions,
   getSessionMessages,
@@ -152,6 +163,11 @@ import {
   setActiveProfile,
 } from "./profiles";
 import {
+  setProfileColor,
+  setProfileAvatar,
+  removeProfileAvatar,
+} from "./profile-meta";
+import {
   readMemory,
   addMemoryEntry,
   updateMemoryEntry,
@@ -167,6 +183,7 @@ import {
 } from "./tools";
 import {
   fetchRegistry,
+  fetchModelRegistry,
   fetchRegistryDetail,
   listInstalledRegistry,
   installRegistryItem,
@@ -281,6 +298,13 @@ import {
   sshRunDump,
   sshDiscoverMemoryProviders,
 } from "./ssh-remote";
+import { applyGpuPreferences, installGpuCrashGuard } from "./gpu-fallback";
+
+// Disable hardware acceleration up front if a prior launch detected a fatal
+// GPU crash (or the user forced it). MUST run before app is ready. See
+// gpu-fallback.ts / issue #592.
+applyGpuPreferences();
+installGpuCrashGuard();
 
 process.on("uncaughtException", (err) => {
   console.error("[MAIN UNCAUGHT]", err);
@@ -291,7 +315,10 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let mainWindow: BrowserWindow | null = null;
-let currentChatAbort: (() => void) | null = null;
+// Per-run abort handles, keyed by the renderer-minted runId. Multiple chats
+// run concurrently (background sessions / multi-agent), so starting a new run
+// must not abort siblings — only a re-send under the same runId does.
+const activeRuns = new Map<string, () => void>();
 
 function openExternalUrl(rawUrl: unknown): void {
   if (!isAllowedExternalUrl(rawUrl)) {
@@ -751,11 +778,69 @@ function setupIPC(): void {
     },
   );
 
+  // Auxiliary (side-task) model routing
+  ipcMain.handle("get-auxiliary-config", (_event, profile?: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) {
+      // TODO: SSH path for auxiliary config (requires sshGetAuxiliaryConfig)
+      return [];
+    }
+    return getAuxiliaryConfig(profile);
+  });
+
+  ipcMain.handle(
+    "set-auxiliary-task",
+    async (
+      _event,
+      task: string,
+      cfg: { provider: string; model: string; baseUrl: string },
+      profile?: string,
+    ) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh) {
+        // TODO: SSH path for auxiliary config (requires sshSetAuxiliaryTask)
+        return false;
+      }
+      setAuxiliaryTask(task, cfg, profile);
+
+      // Restart gateway so it picks up the new auxiliary config
+      if (isGatewayRunning(profile)) {
+        restartGateway(profile);
+      }
+
+      return true;
+    },
+  );
+
+  ipcMain.handle("reset-auxiliary-config", async (_event, profile?: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) {
+      // TODO: SSH path for auxiliary config (requires sshResetAuxiliaryConfig)
+      return false;
+    }
+    resetAuxiliaryToAuto(profile);
+
+    // Restart gateway so it picks up the reset
+    if (isGatewayRunning(profile)) {
+      restartGateway(profile);
+    }
+
+    return true;
+  });
+
   // API_SERVER_KEY management — lets the renderer detect a missing key and
   // generate one with a button click (local mode) or show instructions (remote/SSH).
-  ipcMain.handle("get-api-server-key-status", (_event, profile?: string) => {
-    const key = getApiServerKey(profile);
-    return { hasKey: key.length > 0 };
+  // Additive shape: `hasKey` stays the required primary field; `providerId` /
+  // `checkedAt` are optional extras for a follow-up Settings/Gateway UI.
+  ipcMain.handle("get-api-server-key-status", (_event, profile?: string) =>
+    getApiServerKeyStatus(profile),
+  );
+
+  // Drops the cached secrets-provider values so the next status check re-reads
+  // the vault — lets the renderer's "Refresh from vault" button take effect
+  // immediately instead of waiting out the cache TTL.
+  ipcMain.handle("invalidate-secrets-cache", () => {
+    invalidateSecretsCache();
   });
 
   ipcMain.handle(
@@ -897,7 +982,11 @@ function setupIPC(): void {
       history?: Array<{ role: string; content: string }>,
       attachments?: Attachment[],
       contextFolder?: string,
+      runId?: string,
     ) => {
+      // Each conversation has a stable runId minted by the renderer. Fall back
+      // to a generated id for legacy callers so the run is still tracked.
+      const chatRunId = runId || `run-${randomUUID()}`;
       if (!isRemoteMode() && !isGatewayRunning(profile)) {
         startGateway(profile);
       }
@@ -919,9 +1008,11 @@ function setupIPC(): void {
         }
       }
 
-      if (currentChatAbort) {
-        currentChatAbort();
-      }
+      // Abort only a prior run under the SAME runId (a re-send in the same
+      // conversation). Sibling runs — other background sessions / agents —
+      // keep streaming untouched.
+      const existing = activeRuns.get(chatRunId);
+      if (existing) existing();
 
       let fullResponse = "";
       const chatStartTime = Date.now();
@@ -939,14 +1030,19 @@ function setupIPC(): void {
       // (window closed, reloaded, navigated away). Guard every send so a
       // dead sender doesn't crash the IPC handler, and abort the in-flight
       // chat the first time we see one — there's nobody listening anymore.
+      // Every event carries the runId as its first arg so the renderer can
+      // route it to the right conversation among several running at once.
       const safeSend = (channel: string, payload: unknown): boolean => {
         if (event.sender.isDestroyed()) return false;
         try {
-          event.sender.send(channel, payload);
+          event.sender.send(channel, chatRunId, payload);
           return true;
         } catch {
           return false;
         }
+      };
+      const abortThisRun = (): void => {
+        activeRuns.get(chatRunId)?.();
       };
 
       const handle = await sendMessage(
@@ -954,10 +1050,10 @@ function setupIPC(): void {
         {
           onChunk: (chunk) => {
             fullResponse += chunk;
-            if (!safeSend("chat-chunk", chunk) && currentChatAbort) {
+            if (!safeSend("chat-chunk", chunk)) {
               // Renderer is gone — stop generating and resolve with what we
               // have so the awaiting promise doesn't leak.
-              currentChatAbort();
+              abortThisRun();
             }
           },
           onReasoningChunk: (chunk) => {
@@ -965,16 +1061,19 @@ function setupIPC(): void {
             // the renderer can render the thinking bubble live during the
             // stream rather than waiting for a focus-change refresh (#352).
             // Same renderer-gone abort guard as the content channel.
-            if (!safeSend("chat-reasoning-chunk", chunk) && currentChatAbort) {
-              currentChatAbort();
+            if (!safeSend("chat-reasoning-chunk", chunk)) {
+              abortThisRun();
             }
           },
           onDone: (sessionId) => {
-            currentChatAbort = null;
+            activeRuns.delete(chatRunId);
             try {
               persistPromptImageAttachments(sessionId, message, attachments);
             } catch (err) {
-              console.warn("[sessions] Failed to persist prompt image attachments:", err);
+              console.warn(
+                "[sessions] Failed to persist prompt image attachments:",
+                err,
+              );
             }
             safeSend("chat-done", sessionId || "");
             resolveChat({ response: fullResponse, sessionId });
@@ -995,7 +1094,7 @@ function setupIPC(): void {
             }
           },
           onError: (error) => {
-            currentChatAbort = null;
+            activeRuns.delete(chatRunId);
             safeSend("chat-error", error);
             rejectChat(new Error(error));
             // Notify on error too if window not focused
@@ -1015,6 +1114,9 @@ function setupIPC(): void {
           onUsage: (usage) => {
             safeSend("chat-usage", usage);
           },
+          onClarify: (req) => {
+            safeSend("chat-clarify-request", req);
+          },
         },
         profile,
         resumeSessionId,
@@ -1023,17 +1125,33 @@ function setupIPC(): void {
         contextFolder,
       );
 
-      currentChatAbort = handle.abort;
+      activeRuns.set(chatRunId, handle.abort);
       return promise;
     },
   );
 
-  ipcMain.handle("abort-chat", () => {
-    if (currentChatAbort) {
-      currentChatAbort();
-      currentChatAbort = null;
+  ipcMain.handle("abort-chat", (_event, runId?: string) => {
+    // Abort one run when given its id; with no id (legacy callers) abort all.
+    if (runId) {
+      activeRuns.get(runId)?.();
+      activeRuns.delete(runId);
+      return;
     }
+    for (const abort of activeRuns.values()) abort();
+    activeRuns.clear();
   });
+
+  // Renderer's answer to an inline clarify card. Resolves the pending gateway
+  // request for this request_id, which forwards the answer to `clarify.respond`.
+  ipcMain.handle(
+    "clarify-respond",
+    (_event, payload: { requestId: string; answer: string }) => {
+      return resolvePendingClarify(
+        payload?.requestId ?? "",
+        payload?.answer ?? "",
+      );
+    },
+  );
 
   // Renderer-driven clipboard write (issue #298 — "Copy entire chat").
   // Routed through the main process so it doesn't depend on the renderer's
@@ -1120,6 +1238,28 @@ function setupIPC(): void {
     },
   );
 
+  // Authoritative context-window size for the active model (issue #597).
+  // Resolves the real `context_length` from the provider's /models catalogue;
+  // returns null when unavailable so the renderer falls back to its heuristic.
+  ipcMain.handle(
+    "get-model-context-window",
+    (
+      _event,
+      provider: string,
+      model: string,
+      baseUrl: string | undefined,
+      profile?: string,
+    ) => {
+      return getModelContextWindow(
+        provider,
+        model,
+        baseUrl,
+        undefined,
+        profile,
+      );
+    },
+  );
+
   // Gateway
   ipcMain.handle("start-gateway", async () => {
     const conn = getConnectionConfig();
@@ -1197,34 +1337,39 @@ function setupIPC(): void {
     },
   );
 
-  ipcMain.handle("get-messaging-platforms", async (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "remote") {
-      return fetchRemoteMessagingPlatforms();
-    }
-    if (conn.mode === "ssh" && conn.ssh) {
-      const [envData, enabled, running, platformToolsets] = await Promise.all([
-        sshReadEnv(conn.ssh, profile),
-        sshGetPlatformEnabled(conn.ssh, profile),
-        sshGatewayStatus(conn.ssh),
-        sshGetPlatformToolsets(conn.ssh, profile),
-      ]);
+  ipcMain.handle(
+    "get-messaging-platforms",
+    async (_event, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        return fetchRemoteMessagingPlatforms();
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
+        return buildDesktopMessagingPlatforms(
+          envData,
+          enabled,
+          running,
+          platformToolsets,
+        );
+      }
+      const running = isGatewayRunning(profile);
       return buildDesktopMessagingPlatforms(
-        envData,
-        enabled,
+        readEnv(profile),
+        getPlatformEnabled(profile),
         running,
-        platformToolsets,
+        getPlatformToolsets(profile),
+        readLocalGatewayPlatformStates(profile, running),
       );
-    }
-    const running = isGatewayRunning(profile);
-    return buildDesktopMessagingPlatforms(
-      readEnv(profile),
-      getPlatformEnabled(profile),
-      running,
-      getPlatformToolsets(profile),
-      readLocalGatewayPlatformStates(profile, running),
-    );
-  });
+    },
+  );
 
   ipcMain.handle(
     "update-messaging-platform",
@@ -1279,12 +1424,14 @@ function setupIPC(): void {
         return testRemoteMessagingPlatform(platform);
       }
       if (conn.mode === "ssh" && conn.ssh) {
-        const [envData, enabled, running, platformToolsets] = await Promise.all([
-          sshReadEnv(conn.ssh, profile),
-          sshGetPlatformEnabled(conn.ssh, profile),
-          sshGatewayStatus(conn.ssh),
-          sshGetPlatformToolsets(conn.ssh, profile),
-        ]);
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
         return testDesktopMessagingPlatform(
           platform,
           buildDesktopMessagingPlatforms(
@@ -1365,6 +1512,19 @@ function setupIPC(): void {
     }
     return true;
   });
+
+  // Profile appearance (desktop-only avatar + accent colour). Local-only —
+  // these write to the local ~/.hermes profile dirs, not the SSH remote.
+  ipcMain.handle("set-profile-color", (_event, name: string, color: string) =>
+    setProfileColor(name, color),
+  );
+  ipcMain.handle(
+    "set-profile-avatar",
+    (_event, name: string, dataUrl: string) => setProfileAvatar(name, dataUrl),
+  );
+  ipcMain.handle("remove-profile-avatar", (_event, name: string) =>
+    removeProfileAvatar(name),
+  );
 
   // Memory
   ipcMain.handle("read-memory", (_event, profile?: string) => {
@@ -1924,8 +2084,9 @@ function setupIPC(): void {
     (_event, input: McpServerInput, profile?: string) =>
       addMcpServer(input, profile),
   );
-  ipcMain.handle("remove-mcp-server", (_event, name: string, profile?: string) =>
-    removeMcpServer(name, profile),
+  ipcMain.handle(
+    "remove-mcp-server",
+    (_event, name: string, profile?: string) => removeMcpServer(name, profile),
   );
   ipcMain.handle(
     "set-mcp-server-enabled",
@@ -1947,6 +2108,9 @@ function setupIPC(): void {
   // Discover marketplace (community registry)
   ipcMain.handle("registry-fetch", (_event, force?: boolean) =>
     fetchRegistry(!!force),
+  );
+  ipcMain.handle("registry-fetch-models", (_event, force?: boolean) =>
+    fetchModelRegistry(!!force),
   );
   ipcMain.handle("registry-list-installed", (_event, profile?: string) =>
     listInstalledRegistry(profile),
@@ -2111,7 +2275,9 @@ function setupUpdater(): void {
   // Log the updater's own lifecycle to <userData>/logs/updater.log so a
   // failed update (e.g. issue #271) leaves something to diagnose.
   autoUpdater.logger = updaterLogger;
-  autoUpdater.autoDownload = false;
+  // Auto-download as soon as an update is found, then surface a single
+  // "Restart to Update" action once it's ready — no manual download step.
+  autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("update-available", (info) => {
@@ -2199,6 +2365,27 @@ app.whenReady().then(() => {
     (_wc, permission) => permission === "media",
   );
 
+  // In production, inject PostHog domains into the CSP response header.
+  // Skipped in dev — Vite manages its own CSP headers with nonces for
+  // Fast Refresh inline scripts; overriding them breaks the dev server.
+  if (!is.dev) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      const csp =
+        "default-src 'self'; " +
+        "script-src 'self' 'wasm-unsafe-eval' https://*.posthog.com https://*.i.posthog.com; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob:; " +
+        "connect-src 'self' blob: https://*.posthog.com https://*.i.posthog.com; " +
+        "media-src 'self' blob:";
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [csp],
+        },
+      });
+    });
+  }
+
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
@@ -2249,10 +2436,8 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   cleanupTempMediaFiles();
   stopHealthPolling();
-  if (currentChatAbort) {
-    currentChatAbort();
-    currentChatAbort = null;
-  }
+  for (const abort of activeRuns.values()) abort();
+  activeRuns.clear();
   // Leave profile gateways running on quit (see window-all-closed) so bots
   // and other platforms stay online headless.
   stopSshTunnel();

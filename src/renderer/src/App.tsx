@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { FontProvider } from "./components/FontProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -225,10 +226,22 @@ function App(): React.JSX.Element {
     <ThemeProvider>
       <FontProvider>
         <ErrorBoundary>
-          <div className="app">
+          <div className={`app${isMac ? " is-mac" : ""}`}>
             {isMac && <div className="drag-region" />}
             <div className="app-content">{renderScreen()}</div>
           </div>
+          <Toaster
+            position="bottom-right"
+            reverseOrder={false}
+            toastOptions={{
+              style: {
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-bright)",
+                fontSize: 13,
+              },
+            }}
+          />
         </ErrorBoundary>
       </FontProvider>
     </ThemeProvider>

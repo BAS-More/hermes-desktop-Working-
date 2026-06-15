@@ -198,6 +198,7 @@ import kanbanPtPt from "./locales/pt-PT/kanban";
 import diagnosePtPt from "./locales/pt-PT/diagnose";
 import commonTr from "./locales/tr/common";
 import navigationTr from "./locales/tr/navigation";
+import discoverTr from "./locales/tr/discover";
 import welcomeTr from "./locales/tr/welcome";
 import setupTr from "./locales/tr/setup";
 import chatTr from "./locales/tr/chat";
@@ -450,6 +451,7 @@ export const resources = {
     translation: {
       common: commonTr,
       navigation: navigationTr,
+      discover: discoverTr,
       welcome: welcomeTr,
       setup: setupTr,
       chat: chatTr,

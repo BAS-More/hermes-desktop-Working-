@@ -26,9 +26,9 @@ const result = (id: string, name: string): ToolResultMessage => ({
 
 describe("toolActivityGroupTitle", () => {
   it("keeps the tool name for a single call/result pair", () => {
-    expect(toolActivityGroupTitle([call("a", "terminal"), result("a", "terminal")])).toBe(
-      "terminal",
-    );
+    expect(
+      toolActivityGroupTitle([call("a", "terminal"), result("a", "terminal")]),
+    ).toBe("Terminal");
   });
 
   it("summarizes groups with more than one tool call", () => {
@@ -49,6 +49,6 @@ describe("toolActivityGroupTitle", () => {
         result("a", "terminal"),
         result("b", "terminal"),
       ]),
-    ).toBe("terminal");
+    ).toBe("Terminal");
   });
 });

@@ -321,7 +321,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
   async function handleTestConnection(): Promise<void> {
     if (connMode === "ssh") {
       if (!sshHost.trim() || !sshUser.trim()) {
-        setConnStatus("Host and username are required");
+        setConnStatus(t("settings.sshErrorRequiredSimple"));
         return;
       }
       setConnTesting(true);
@@ -334,11 +334,11 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         parseInt(sshRemotePort, 10) || 8642,
       );
       setConnTesting(false);
-      setConnStatus(ok ? "SSH tunnel connected!" : "Could not connect via SSH");
+      setConnStatus(ok ? t("settings.sshSuccess") : t("settings.sshErrorFailedSimple"));
     } else {
       const url = connRemoteUrl.trim();
       if (!url) {
-        setConnStatus("Please enter a URL");
+        setConnStatus(t("settings.remoteErrorRequiredSimple"));
         return;
       }
       setConnTesting(true);
@@ -348,7 +348,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         getConnectionApiKeyForSave(),
       );
       setConnTesting(false);
-      setConnStatus(ok ? "Connected successfully!" : "Could not reach server");
+      setConnStatus(ok ? t("settings.remoteSuccess") : t("settings.remoteErrorFailedSimple"));
     }
   }
 
@@ -384,7 +384,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
       if (!file) return;
       setImporting(true);
       setImportResult(null);
-      const filePath = (file as File & { path: string }).path;
+      const filePath = window.hermesAPI.getPathForFile(file);
       const result = await window.hermesAPI.runHermesImport(filePath, profile);
       setImporting(false);
       if (result.success) {
@@ -592,11 +592,10 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
       </div>
 
       <div className="settings-section">
-        <div className="settings-section-title">Community</div>
+        <div className="settings-section-title">{t("settings.communityTitle")}</div>
         <div className="settings-field">
           <div className="settings-field-hint" style={{ marginBottom: 10 }}>
-            Join our Discord channel to ask questions, report issues, and chat
-            with other Hermes users.
+            {t("settings.communityHint")}
           </div>
           <div className="settings-hermes-actions">
             <button
@@ -607,7 +606,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
               title={DISCORD_COMMUNITY_URL}
             >
               <Send size={14} style={{ marginRight: 6 }} />
-              Join Discord Channel
+              {t("settings.joinDiscord")}
             </button>
           </div>
         </div>
@@ -647,14 +646,14 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
               className={`settings-theme-option ${connMode === "ssh" ? "active" : ""}`}
               onClick={() => setConnMode("ssh")}
             >
-              SSH Tunnel
+              {t("settings.modeSsh")}
             </button>
           </div>
           <div className="settings-field-hint">
             {connMode === "local"
               ? t("settings.modeLocalHint")
               : connMode === "ssh"
-                ? "Tunnel to a remote Hermes over SSH — no exposed ports or API keys needed."
+                ? t("settings.modeSshHint")
                 : t("settings.modeRemoteHint")}
           </div>
         </div>
@@ -662,12 +661,10 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         {!apiServerKeyMissing ? null : connMode === "local" ? (
           <div className="settings-api-key-banner">
             <div className="settings-api-key-banner-title">
-              Session history disabled — <code>API_SERVER_KEY</code> not set
+              {t("settings.sessionDisabledTitle")}
             </div>
             <div className="settings-api-key-banner-desc">
-              Without an API server key the gateway cannot authenticate session
-              continuation requests. Messages will still send, but conversation
-              history won&apos;t be preserved across restarts.
+              {t("settings.sessionDisabledDesc")}
             </div>
             <button
               className="btn btn-primary"
@@ -677,22 +674,22 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
                 await window.hermesAPI.generateApiServerKey(profile);
                 setApiServerKeyMissing(false);
                 setGeneratingKey(false);
-                setConnStatus("API key generated — gateway restarting…");
+                setConnStatus(t("settings.apiGenerated"));
                 setTimeout(() => setConnStatus(null), 4000);
               }}
             >
-              {generatingKey ? "Generating…" : "Generate & save a key for me"}
+              {generatingKey ? t("settings.generating") : t("settings.generateKey")}
             </button>
           </div>
         ) : (
           <div className="settings-api-key-banner settings-api-key-banner--info">
             <div className="settings-api-key-banner-title">
-              Set <code>API_SERVER_KEY</code> on the remote server
+              {t("settings.remoteEnvTitle")}
             </div>
             <div className="settings-api-key-banner-desc">
               {connMode === "ssh"
-                ? "SSH mode: add API_SERVER_KEY=<your-key> to ~/.hermes/profiles/<profile>/.env on the remote host, then restart the gateway there."
-                : "Remote mode: add API_SERVER_KEY=<your-key> to the .env on your remote Hermes server, then restart the gateway."}
+                ? t("settings.remoteEnvSshDesc")
+                : t("settings.remoteEnvDesc")}
             </div>
           </div>
         )}
@@ -759,17 +756,17 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         {connMode === "ssh" && (
           <>
             <div className="settings-field">
-              <label className="settings-field-label">SSH Host</label>
+              <label className="settings-field-label">{t("settings.sshHost")}</label>
               <input
                 className="input"
                 type="text"
                 value={sshHost}
                 onChange={(e) => setSshHost(e.target.value)}
-                placeholder="192.168.1.100 or myserver.local"
+                placeholder={t("settings.sshHostPlaceholder")}
               />
             </div>
             <div className="settings-field">
-              <label className="settings-field-label">SSH Port</label>
+              <label className="settings-field-label">{t("settings.sshPort")}</label>
               <input
                 className="input"
                 type="number"
@@ -779,20 +776,20 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
               />
             </div>
             <div className="settings-field">
-              <label className="settings-field-label">Username</label>
+              <label className="settings-field-label">{t("settings.sshUsername")}</label>
               <input
                 className="input"
                 type="text"
                 value={sshUser}
                 onChange={(e) => setSshUser(e.target.value)}
-                placeholder="hermes"
+                placeholder={t("settings.sshUsernamePlaceholder")}
               />
             </div>
             <div className="settings-field">
               <label className="settings-field-label">
-                Private Key Path{" "}
+                {t("settings.sshKeyPath")}{" "}
                 <span style={{ fontWeight: 400, opacity: 0.6 }}>
-                  (optional, defaults to ~/.ssh/id_rsa)
+                  {t("settings.sshKeyPathOptional")}
                 </span>
               </label>
               <input
@@ -805,9 +802,9 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
             </div>
             <div className="settings-field">
               <label className="settings-field-label">
-                Remote Hermes Port{" "}
+                {t("settings.sshRemotePort")}{" "}
                 <span style={{ fontWeight: 400, opacity: 0.6 }}>
-                  (default 8642)
+                  {t("settings.sshRemotePortDefault")}
                 </span>
               </label>
               <input
@@ -818,16 +815,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
                 placeholder="8642"
               />
               <div className="settings-field-hint">
-                Make sure you can run{" "}
-                <code style={{ fontFamily: "monospace" }}>
-                  ssh {sshUser || "user"}@{sshHost || "host"}
-                </code>{" "}
-                without a password prompt. The first connection trusts the host
-                key and stores it in{" "}
-                <code style={{ fontFamily: "monospace" }}>
-                  ~/.ssh/known_hosts
-                </code>
-                ; SSH will fail closed if that key changes later.
+                {t("settings.sshHint", { cmd: `${sshUser || "user"}@${sshHost || "host"}` })}
               </div>
             </div>
             <div className="settings-hermes-actions">
@@ -836,7 +824,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
                 onClick={handleTestConnection}
                 disabled={connTesting}
               >
-                {connTesting ? "Testing SSH…" : "Test SSH Connection"}
+                {connTesting ? t("settings.testingSsh") : t("settings.testSsh")}
               </button>
               <button
                 className="btn btn-primary"

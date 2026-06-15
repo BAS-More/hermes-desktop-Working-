@@ -12,20 +12,32 @@
   <a href="https://github.com/fathah/hermes-desktop/releases/">
   <img src="https://img.shields.io/github/downloads/fathah/hermes-desktop/total?style=for-the-badge&color=00B496&label=Total%20Downloads" alt="Downloads">
 </a>
+   <a href="https://bankr.bot/launches/0xfda75f77a22b4f4b783bbbb21915ef64d149bba3">
+  <img src="https://img.shields.io/badge/Token-$HD-purple?style=for-the-badge" alt="Downloads">
+</a>
+  
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.ja-JP.md">日本語</a> ·
+  <a href="README.es-LATAM.md">Español (LATAM)</a>
 </p>
 
 > **This project is in active development.** Features may change, and some things might break. If you run into a problem or have an idea, [open an issue](https://github.com/fathah/hermes-desktop/issues). Contributions are welcome!
 
-## Languages
-
-- English: `README.md`
-- 简体中文: `README.zh-CN.md`
-- 日本語: `README.ja-JP.md`
-- 🌎 Español (LATAM): `README.es-LATAM.md`
-
 Hermes Desktop is a native desktop app for installing, configuring, and chatting with [Hermes Agent](https://github.com/NousResearch/hermes-agent) — a self-improving AI assistant with tool use, multi-platform messaging, and a closed learning loop.
 
 Instead of managing the CLI by hand, the app walks through install, provider setup, and day-to-day usage in one place. It uses the official Hermes install script, stores Hermes in `~/.hermes`, and gives you a GUI for chat, sessions, profiles, memory, skills, tools, scheduling, messaging gateways, and more.
+
+## Sponsors
+
+<a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop" target="_blank" rel="noopener noreferrer">
+    <img src="src/renderer/src/assets/logos/atlascloud.svg" alt="Atlas Cloud" height="100" style="display: block;">
+  </a>
+  
+  > **[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop)** is a full-modal, OpenAI-compatible AI inference platform (DeepSeek, Qwen, GLM, Kimi, MiniMax, and more). Use it in Hermes Desktop by selecting **Atlas Cloud** as your provider — the base URL is pre-configured automatically.
 
 ## Install
 
@@ -137,6 +149,12 @@ In local mode, chat requests go through `http://127.0.0.1:8642` with SSE streami
 
 ## Supported Providers
 
+### Sponsors
+
+| Provider        | Notes                                                                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Atlas Cloud** | OpenAI-compatible gateway — DeepSeek, Qwen, GLM, Kimi, MiniMax and more ([atlascloud.ai](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop)) |
+
 ### LLM Providers
 
 | Provider            | Notes                                    |
@@ -240,6 +258,87 @@ Hermes files are managed in:
 - `~/.hermes/profiles/` — named profile directories
 - `~/.hermes/state.db` — session history database
 - `~/.hermes/cron/jobs.json` — scheduled tasks
+
+## Secrets provider
+
+By default, API keys live in `~/.hermes/.env` (the **env** provider). No
+configuration is needed — this is byte-for-byte the historical behavior, and
+nothing changes for you.
+
+If you'd rather not keep keys in a plaintext `.env`, the opt-in **command**
+provider resolves them by running a helper command you configure. Resolution
+order everywhere is: `process.env` → `.env` → provider → unset.
+
+Per-key helper (the requested key name arrives as `$HERMES_SECRET_KEY`):
+
+```yaml
+# ~/.hermes/config.yaml
+secrets:
+  provider: command
+  command: secret-tool lookup hermes "$HERMES_SECRET_KEY"
+```
+
+Or a helper that dumps a dotenv blob (e.g. a vault that unseals into tmpfs):
+
+```yaml
+secrets:
+  provider: command
+  command: "cat /run/user/1000/hermes-secrets.env"
+```
+
+The helper's stdout may be either a single bare value (per-key helpers) or
+`KEY=VALUE` lines (dotenv dumps); both shapes are auto-detected.
+
+### Vault / secret manager integration (no TPM required)
+
+The `command` provider is **vault-agnostic** — it runs whatever helper you
+configure and reads its stdout. The helper is the only thing that needs to
+talk to your secret store. If you don't have a TPM-sealed keyfile, any of
+these work without code changes to Hermes:
+
+- **KeePassXC (password-only DB, no keyfile):** point `secrets.command` at a
+  small `kpxc-export.sh` script that does
+  `keepassxc-cli ls ~/secrets/hermes.kdbx <<<"$KPXC_PASSWORD"` and dumps
+  the relevant group as dotenv. Prompt the user for the master password
+  once per session.
+- **GnuPG with a passphrase-only key:** `gpg --batch --passphrase-fd 0
+  --decrypt ~/.keys/api-keys.gpg` works directly as the `command` value.
+  Pass the passphrase via a file descriptor or env var, never argv.
+- **`pass` (the standard unix password manager):**
+  `command: "pass show hermes/$HERMES_SECRET_KEY"` for a per-key helper,
+  or a small wrapper script for a dotenv dump.
+- **`secret-tool` (libsecret/Gnome Keyring):**
+  `command: "secret-tool lookup hermes $HERMES_SECRET_KEY"` (already
+  shown above as the canonical per-key example).
+- **Bitwarden CLI:** `bw get item "$HERMES_SECRET_KEY" | jq -r .notes`
+  (after `bw unlock` in the session).
+- **1Password CLI:** `op read "op://vault/$HERMES_SECRET_KEY/credential"`.
+- **Plain env file with user-managed permissions:**
+  `command: "cat ~/.config/hermes/secrets.env"` with `chmod 600` and
+  the file owned by your user. Not as secure as a vault, but better than
+  a world-readable `.env`.
+
+The point: **any helper that prints a value (per-key) or a dotenv blob
+(list-mode) on stdout will work**, and Hermes imposes a 3-second timeout
+and 1 MiB output cap on the helper so a misbehaving one can't wedge the
+app. The provider makes no assumptions about TPM, FIDO2, smart cards,
+or platform keychains.
+
+Security model:
+
+- The command string is your own configuration — same trust level as `.env`.
+  It runs via `/bin/sh -c`, so the command provider is POSIX-only
+  (Linux/macOS); Windows stays on the env provider.
+- The helper inherits the process environment plus `HERMES_SECRET_KEY`; the
+  key name is passed as data, never interpolated into the shell string.
+- Hard 3-second timeout (resolution is synchronous on the main process — keep
+  helpers fast and non-interactive), 1 MiB output cap, and stderr is discarded.
+- Resolved values are never logged or written to disk; failures degrade to
+  "key unset", logging only exit code/signal.
+- The gateway-spawn broadcast uses a single `list()` call, never a per-key
+  helper loop.
+
+Source of truth: [`src/main/secrets/`](src/main/secrets/).
 
 ## Tech Stack
 

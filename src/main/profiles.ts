@@ -17,6 +17,7 @@ import {
   PROFILE_NAME_ERROR,
 } from "./utils";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
+import { readProfileMeta, defaultColorForName } from "./profile-meta";
 
 const PROFILES_DIR = join(HERMES_HOME, "profiles");
 
@@ -42,6 +43,10 @@ export interface ProfileInfo {
   hasSoul: boolean;
   skillCount: number;
   gatewayRunning: boolean;
+  /** Resolved accent colour (stored override, else a stable default). */
+  color: string;
+  /** Avatar image as a data URL, or null when none is set. */
+  avatar: string | null;
 }
 
 async function readProfileConfig(profilePath: string): Promise<{
@@ -132,12 +137,14 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     defaultHasSoul,
     defaultSkills,
     defaultGw,
+    defaultMeta,
   ] = await Promise.all([
     readProfileConfig(HERMES_HOME),
     fileExists(join(HERMES_HOME, ".env")),
     fileExists(join(HERMES_HOME, "SOUL.md")),
     countSkills(HERMES_HOME),
     isGatewayRunning(HERMES_HOME),
+    readProfileMeta("default"),
   ]);
 
   profiles.push({
@@ -151,6 +158,8 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     hasSoul: defaultHasSoul,
     skillCount: defaultSkills,
     gatewayRunning: defaultGw,
+    color: defaultMeta.color || defaultColorForName("default"),
+    avatar: defaultMeta.avatar || null,
   });
 
   // Named profiles under ~/.hermes/profiles/
@@ -170,13 +179,14 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
         // We deliberately do NOT require config.yaml or .env to exist —
         // a freshly created profile may have neither yet, and filtering on
         // them silently hides it from the UI (issue #19).
-        const [config, hasEnvFile, hasSoul, skillCount, gwRunning] =
+        const [config, hasEnvFile, hasSoul, skillCount, gwRunning, meta] =
           await Promise.all([
             readProfileConfig(profilePath),
             fileExists(join(profilePath, ".env")),
             fileExists(join(profilePath, "SOUL.md")),
             countSkills(profilePath),
             isGatewayRunning(profilePath),
+            readProfileMeta(name),
           ]);
 
         return {
@@ -190,6 +200,8 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
           hasSoul: hasSoul,
           skillCount,
           gatewayRunning: gwRunning,
+          color: meta.color || defaultColorForName(name),
+          avatar: meta.avatar || null,
         } as ProfileInfo;
       });
 

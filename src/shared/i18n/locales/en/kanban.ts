@@ -98,4 +98,9 @@ export default {
   errArchive: "Failed to archive task",
   errReclaim: "Failed to reclaim",
   errDispatch: "Dispatch failed",
+
+  // Tooltips & buttons
+  hqBoardTooltip: "Claw3D headquarters board (read-only mirror)",
+  dismissError: "Dismiss error",
+  closeTaskDetails: "Close task details",
 } as const;

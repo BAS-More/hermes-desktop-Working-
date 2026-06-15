@@ -239,6 +239,23 @@ export function updateSessionTitle(sessionId: string, title: string): void {
     cache.sessions[idx].title = title;
     writeCache(cache);
   }
+  // Also persist in state.db so the rename survives cache rebuilds
+  try {
+    const dbPath = activeStateDbPath();
+    if (existsSync(dbPath)) {
+      const db = new Database(dbPath);
+      try {
+        db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(
+          title,
+          sessionId,
+        );
+      } finally {
+        db.close();
+      }
+    }
+  } catch {
+    // ignore DB errors — cache update above is the fast path
+  }
 }
 
 // Remove a session entry from the local cache. Called after the underlying

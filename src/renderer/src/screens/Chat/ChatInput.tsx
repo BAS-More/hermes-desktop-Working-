@@ -7,7 +7,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Send, Square as Stop, Slash, Paperclip, Mic } from "lucide-react";
+import { Square as Stop, Slash, Paperclip, Mic, ArrowUp } from "lucide-react";
 import { isImeComposing } from "./keyboard";
 import { useI18n } from "../../components/useI18n";
 import { SLASH_COMMANDS, type SlashCommand } from "./slashCommands";
@@ -574,7 +574,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   disabled={!canSend}
                   title={t("chat.send")}
                 >
-                  <Send size={16} />
+                  <ArrowUp size={20} />
                 </button>
               </>
             )}

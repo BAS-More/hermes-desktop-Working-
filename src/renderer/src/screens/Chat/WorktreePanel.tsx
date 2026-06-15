@@ -42,6 +42,7 @@ function TreeItem({
   depth,
   onFileClick,
 }: TreeItemProps): React.JSX.Element {
+  const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,14 +113,14 @@ function TreeItem({
               className="worktree-loading"
               style={{ paddingLeft: paddingLeft + 12 }}
             >
-              Loading...
+              {t("chat.worktree.loading")}...
             </div>
           ) : children === null ? null : children.length === 0 ? (
             <div
               className="worktree-empty"
               style={{ paddingLeft: paddingLeft + 12 }}
             >
-              Empty folder
+              {t("chat.worktree.emptyFolder")}
             </div>
           ) : (
             children.map((child) => (
@@ -158,7 +159,7 @@ export const WorktreePanel = memo(function WorktreePanel({
       const result = await window.hermesAPI.readDirectory(folderPath);
       if (cancelled) return;
       if (result === null) {
-        setError("Failed to load folder contents");
+        setError(t("chat.worktree.errorLoading"));
       } else {
         // Sort: directories first, then files, both alphabetically
         const sorted = result.sort((a, b) => {
@@ -210,11 +211,11 @@ export const WorktreePanel = memo(function WorktreePanel({
       )}
       <div className="worktree-content">
         {isLoading ? (
-          <div className="worktree-loading">Loading...</div>
+          <div className="worktree-loading">{t("chat.worktree.loading")}...</div>
         ) : error ? (
           <div className="worktree-error">{error}</div>
         ) : entries === null || entries.length === 0 ? (
-          <div className="worktree-empty">Folder is empty</div>
+          <div className="worktree-empty">{t("chat.worktree.empty")}</div>
         ) : (
           entries.map((entry) => (
             <TreeItem

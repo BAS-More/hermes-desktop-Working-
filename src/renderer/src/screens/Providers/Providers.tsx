@@ -543,7 +543,10 @@ function Providers({
                     const isUnavailable =
                       status === "dead" || status === "exhausted";
                     return (
-                      <div key={entry.id || idx} className="settings-pool-entry">
+                      <div
+                        key={entry.id || idx}
+                        className="settings-pool-entry"
+                      >
                         <span className="settings-pool-label">
                           {entry.label ||
                             `${t("settings.keyLabel")} ${idx + 1}`}

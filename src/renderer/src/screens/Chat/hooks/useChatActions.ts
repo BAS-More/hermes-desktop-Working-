@@ -16,6 +16,9 @@ interface LocalCommands {
 }
 
 interface UseChatActionsArgs {
+  /** This conversation's run id — threaded to the main process so its events
+   *  are tagged and its abort targets only this run. */
+  runId: string;
   profile?: string;
   hermesSessionId: string | null;
   messages: ChatMessage[];
@@ -48,6 +51,7 @@ interface UseChatActionsResult {
  * and `isLoading` are read via live refs that update via `useEffect`.
  */
 export function useChatActions({
+  runId,
   profile,
   hermesSessionId,
   messages,
@@ -94,12 +98,13 @@ export function useChatActions({
           })),
           attachments,
           contextFolder ?? undefined,
+          runId,
         );
       } catch {
         // onChatError IPC already surfaces this to the user
       }
     },
-    [profile, hermesSessionId, contextFolder],
+    [runId, profile, hermesSessionId, contextFolder],
   );
 
   const handleSend = useCallback(
@@ -138,10 +143,10 @@ export function useChatActions({
   );
 
   const handleAbort = useCallback(() => {
-    window.hermesAPI.abortChat();
+    window.hermesAPI.abortChat(runId);
     setIsLoading(false);
     setTimeout(() => chatInputRef.current?.focus(), 50);
-  }, [chatInputRef, setIsLoading]);
+  }, [runId, chatInputRef, setIsLoading]);
 
   const handleApprove = useCallback(() => {
     chatInputRef.current?.clear();
