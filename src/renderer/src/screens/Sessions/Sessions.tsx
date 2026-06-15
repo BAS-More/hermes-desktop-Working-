@@ -22,6 +22,7 @@ import {
 } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import { defaultColorForName } from "../../../../shared/profileColors";
+import { useFocusTrap } from "../shared/useFocusTrap";
 
 type SessionStatus = "active" | "paused" | "complete";
 
@@ -214,42 +215,198 @@ const SessionActionMenu = memo(function SessionActionMenu({
 }): React.JSX.Element {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [submenu, setSubmenu] = useState(false);
+  const [groupExpanded, setGroupExpanded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Roving focus over the flat list of menu items.
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
 
+  const close = useCallback((returnFocus = true): void => {
+    setOpen(false);
+    setGroupExpanded(false);
+    if (returnFocus) triggerRef.current?.focus();
+  }, []);
+
+  // Build the flat, ordered list of menu actions. The "move to group" row and
+  // its (inline-expanded) group options are part of the same flat sequence so
+  // arrow-key roving is linear — no flyout to clip at the viewport edge.
+  type Item = { key: string; label: React.ReactNode; run: () => void; danger?: boolean; expander?: boolean };
+  const items: Item[] = [];
+  items.push({
+    key: "pin",
+    label: session.pinned ? t("sessions.actions.unpin") : t("sessions.actions.pin"),
+    run: onPinToggle,
+  });
+  items.push({
+    key: "pause",
+    label:
+      session.status === "paused" ? (
+        <>
+          <Play size={13} /> {t("sessions.actions.resume")}
+        </>
+      ) : (
+        <>
+          <Pause size={13} /> {t("sessions.actions.pause")}
+        </>
+      ),
+    run: onPauseResume,
+  });
+  if (session.status !== "complete") {
+    items.push({
+      key: "complete",
+      label: (
+        <>
+          <Check size={13} /> {t("sessions.actions.markComplete")}
+        </>
+      ),
+      run: onMarkComplete,
+    });
+  }
+  items.push({
+    key: "rename",
+    label: (
+      <>
+        <Pencil size={13} /> {t("sessions.actions.rename")}
+      </>
+    ),
+    run: onRename,
+  });
+  // The group expander toggles an inline section rather than navigating away.
+  items.push({
+    key: "move",
+    label: (
+      <>
+        {t("sessions.actions.moveToGroup")}
+        <span aria-hidden style={{ marginLeft: "auto" }}>
+          {groupExpanded ? "▾" : "▸"}
+        </span>
+      </>
+    ),
+    run: () => setGroupExpanded((v) => !v),
+    expander: true,
+  });
+  if (groupExpanded) {
+    items.push({
+      key: "grp-none",
+      label: <span style={{ paddingLeft: 16 }}>{t("sessions.noGroup")}</span>,
+      run: () => onMoveToGroup(null),
+    });
+    for (const g of groups) {
+      items.push({
+        key: `grp-${g.id}`,
+        label: <span style={{ paddingLeft: 16 }}>{g.name}</span>,
+        run: () => onMoveToGroup(g.id),
+      });
+    }
+    items.push({
+      key: "grp-new",
+      label: <span style={{ paddingLeft: 16 }}>{t("sessions.newGroup")}</span>,
+      run: onNewGroup,
+    });
+  }
+  items.push({
+    key: "copy",
+    label: (
+      <>
+        <Copy size={13} /> {t("sessions.actions.copyLink")}
+      </>
+    ),
+    run: onCopyLink,
+  });
+  items.push({
+    key: "share",
+    label: (
+      <>
+        <Send size={13} /> {t("sessions.actions.share")}
+      </>
+    ),
+    run: onShare,
+  });
+  items.push({
+    key: "archive",
+    label: session.archived
+      ? t("sessions.actions.unarchive")
+      : t("sessions.actions.archive"),
+    run: onArchiveToggle,
+  });
+  items.push({
+    key: "delete",
+    label: (
+      <>
+        <Trash size={13} /> {t("sessions.actions.delete")}
+      </>
+    ),
+    run: onDelete,
+    danger: true,
+  });
+
+  // Outside-click closes (without stealing focus back to the trigger).
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSubmenu(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setSubmenu(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) close(false);
     };
     document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open, close]);
 
-  const run = (fn: () => void) => (e: React.MouseEvent) => {
+  // On open, move focus into the popover (first item). Clamp active index when
+  // the list length changes (e.g. group section expands/collapses).
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex(0);
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const el = itemRefs.current[Math.min(activeIndex, items.length - 1)];
+    if (el) el.focus();
+  }, [open, activeIndex, items.length]);
+
+  const onMenuKeyDown = (e: React.KeyboardEvent): void => {
     e.stopPropagation();
-    setOpen(false);
-    setSubmenu(false);
-    fn();
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % items.length);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + items.length) % items.length);
+        break;
+      case "Home":
+        e.preventDefault();
+        setActiveIndex(0);
+        break;
+      case "End":
+        e.preventDefault();
+        setActiveIndex(items.length - 1);
+        break;
+      case "Escape":
+        e.preventDefault();
+        close();
+        break;
+      case "Tab":
+        close(false);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const activate = (item: Item) => (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    item.run();
+    // Expanders keep the menu open (the group section toggles in place);
+    // everything else closes and returns focus to the trigger.
+    if (!item.expander) close();
   };
 
   return (
     <div className="sessions-menu" ref={ref}>
       <button
         type="button"
+        ref={triggerRef}
         className="sessions-card-menu-btn"
         title={t("sessions.actions.menu")}
         aria-label={t("sessions.actions.menu")}
@@ -259,89 +416,40 @@ const SessionActionMenu = memo(function SessionActionMenu({
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        onKeyDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          // ArrowDown / Enter / Space open the menu and land on the first item.
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
       >
         <span aria-hidden>⋯</span>
       </button>
       {open && (
-        <div className="sessions-menu-popover" role="menu">
-          <button role="menuitem" onClick={run(onPinToggle)}>
-            {session.pinned
-              ? t("sessions.actions.unpin")
-              : t("sessions.actions.pin")}
-          </button>
-          <button role="menuitem" onClick={run(onPauseResume)}>
-            {session.status === "paused" ? (
-              <>
-                <Play size={13} /> {t("sessions.actions.resume")}
-              </>
-            ) : (
-              <>
-                <Pause size={13} /> {t("sessions.actions.pause")}
-              </>
-            )}
-          </button>
-          {session.status !== "complete" && (
-            <button role="menuitem" onClick={run(onMarkComplete)}>
-              <Check size={13} /> {t("sessions.actions.markComplete")}
-            </button>
-          )}
-          <button role="menuitem" onClick={run(onRename)}>
-            <Pencil size={13} /> {t("sessions.actions.rename")}
-          </button>
-          <div className="sessions-menu-sub">
+        <div
+          className="sessions-menu-popover"
+          role="menu"
+          aria-label={t("sessions.actions.menu")}
+          onKeyDown={onMenuKeyDown}
+        >
+          {items.map((item, i) => (
             <button
-              role="menuitem"
-              aria-haspopup="menu"
-              aria-expanded={submenu}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSubmenu((v) => !v);
+              key={item.key}
+              ref={(el) => {
+                itemRefs.current[i] = el;
               }}
+              role="menuitem"
+              tabIndex={i === activeIndex ? 0 : -1}
+              aria-expanded={item.expander ? groupExpanded : undefined}
+              className={item.danger ? "sessions-menu-danger" : undefined}
+              onMouseEnter={() => setActiveIndex(i)}
+              onClick={activate(item)}
             >
-              {t("sessions.actions.moveToGroup")} ▸
+              {item.label}
             </button>
-            {submenu && (
-              <div className="sessions-menu-popover sessions-menu-popover--sub">
-                <button
-                  role="menuitem"
-                  onClick={run(() => onMoveToGroup(null))}
-                >
-                  {t("sessions.noGroup")}
-                </button>
-                {groups.map((g) => (
-                  <button
-                    key={g.id}
-                    role="menuitem"
-                    onClick={run(() => onMoveToGroup(g.id))}
-                  >
-                    {g.name}
-                  </button>
-                ))}
-                <button role="menuitem" onClick={run(onNewGroup)}>
-                  {t("sessions.newGroup")}
-                </button>
-              </div>
-            )}
-          </div>
-          <button role="menuitem" onClick={run(onCopyLink)}>
-            <Copy size={13} /> {t("sessions.actions.copyLink")}
-          </button>
-          <button role="menuitem" onClick={run(onShare)}>
-            <Send size={13} /> {t("sessions.actions.share")}
-          </button>
-          <button role="menuitem" onClick={run(onArchiveToggle)}>
-            {session.archived
-              ? t("sessions.actions.unarchive")
-              : t("sessions.actions.archive")}
-          </button>
-          <button
-            role="menuitem"
-            className="sessions-menu-danger"
-            onClick={run(onDelete)}
-          >
-            <Trash size={13} /> {t("sessions.actions.delete")}
-          </button>
+          ))}
         </div>
       )}
     </div>
@@ -367,6 +475,7 @@ const SessionCard = memo(function SessionCard({
   selected = false,
   onToggleSelected,
   selectTitle,
+  snippet,
   onPinToggle,
   onPauseResume,
   onMarkComplete,
@@ -393,6 +502,7 @@ const SessionCard = memo(function SessionCard({
   selected?: boolean;
   onToggleSelected?: (id: string) => void;
   selectTitle?: string;
+  snippet?: React.ReactNode;
   onPinToggle: (session: SessionRow) => void;
   onPauseResume: (session: SessionRow) => void;
   onMarkComplete: (session: SessionRow) => void;
@@ -410,32 +520,26 @@ const SessionCard = memo(function SessionCard({
     onClick();
   };
 
+  // Card structure (a11y fix): the row is a plain <li> container — NOT a
+  // role="button" — because it must hold other interactive elements
+  // (menu, checkbox, rename input). The "open this session" affordance is a
+  // dedicated <button> that wraps the title + time. In selection mode the
+  // whole row reads as a checkbox label so a click anywhere toggles selection.
+  const openLabel = session.title || "New conversation";
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <li
       className={`sessions-card ${isActive ? "sessions-card--active" : ""} ${
         selected ? "sessions-card--selected" : ""
       } ${session.pinned ? "sessions-card--pinned" : ""}`}
-      onClick={activate}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          activate();
-        }
-      }}
     >
       <div className="sessions-card-main">
         {selectionMode && (
-          <label
-            className="sessions-card-select"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <label className="sessions-card-select">
             <input
               type="checkbox"
               checked={selected}
               onChange={() => onToggleSelected?.(session.id)}
-              aria-label={selectTitle}
+              aria-label={`${selectTitle ?? "Select"}: ${openLabel}`}
             />
           </label>
         )}
@@ -446,6 +550,7 @@ const SessionCard = memo(function SessionCard({
             className="sessions-card-rename-input"
             type="text"
             value={renameValue}
+            aria-label={openLabel}
             onChange={(e) => onRenameChange?.(e.target.value)}
             onKeyDown={(e) => {
               e.stopPropagation();
@@ -458,18 +563,38 @@ const SessionCard = memo(function SessionCard({
               }
             }}
             onBlur={() => onRenameConfirm?.()}
-            onClick={(e) => e.stopPropagation()}
           />
+        ) : selectionMode ? (
+          // Selection mode: clicking the title body toggles selection.
+          <button
+            type="button"
+            className="sessions-card-open sessions-card-open--select"
+            onClick={activate}
+            aria-pressed={selected}
+          >
+            <span className="sessions-card-title">{openLabel}</span>
+            <span className="sessions-card-time">
+              {showFullDate
+                ? formatFullDate(session.startedAt)
+                : formatTime(session.startedAt)}
+            </span>
+          </button>
         ) : (
-          <span className="sessions-card-title">
-            {session.title || "New conversation"}
-          </span>
+          // Normal mode: real button to open/resume the session.
+          <button
+            type="button"
+            className="sessions-card-open"
+            onClick={activate}
+            aria-label={`Open ${openLabel}`}
+          >
+            <span className="sessions-card-title">{openLabel}</span>
+            <span className="sessions-card-time">
+              {showFullDate
+                ? formatFullDate(session.startedAt)
+                : formatTime(session.startedAt)}
+            </span>
+          </button>
         )}
-        <span className="sessions-card-time">
-          {showFullDate
-            ? formatFullDate(session.startedAt)
-            : formatTime(session.startedAt)}
-        </span>
       </div>
       <div className="sessions-card-tags">
         <ProfileChip profile={session.profile} />
@@ -501,7 +626,8 @@ const SessionCard = memo(function SessionCard({
           />
         )}
       </div>
-    </div>
+      {snippet}
+    </li>
   );
 });
 
@@ -533,11 +659,21 @@ function Sessions({
     SessionRow[] | null
   >(null);
   const [deletingBulk, setDeletingBulk] = useState(false);
+  // New-group modal. `target` is the session to drop into the new group after
+  // creation, or "header" when created from the toolbar button (no session).
+  const [newGroupCtx, setNewGroupCtx] = useState<
+    { profile: string; target: SessionRow | "header" } | null
+  >(null);
+  const [newGroupName, setNewGroupName] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestId = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newGroupModalRef = useRef<HTMLDivElement>(null);
+  const newGroupInputRef = useRef<HTMLInputElement>(null);
+  const deleteModalRef = useRef<HTMLDivElement>(null);
+  const bulkDeleteModalRef = useRef<HTMLDivElement>(null);
 
   // Rename state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -693,28 +829,48 @@ function Sessions({
     [patchSession],
   );
 
-  const handleNewGroup = useCallback(
-    (s: SessionRow): void => {
-      const name = window.prompt(t("sessions.newGroupPrompt"));
-      if (!name || !name.trim()) return;
-      void (async () => {
-        const created = await window.hermesAPI.createSessionGroup(
-          s.profile,
-          name.trim(),
-        );
-        if (created) {
-          await loadGroups();
-          patchSession(s.id, { groupId: created.id });
+  // Open the styled new-group modal. From a card's menu we remember the
+  // session so it's dropped into the group on create; from the header button
+  // there's no session (target "header") and we just create the group.
+  const handleNewGroup = useCallback((s: SessionRow): void => {
+    setNewGroupName("");
+    setNewGroupCtx({ profile: s.profile, target: s });
+  }, []);
+
+  const handleNewGroupFromHeader = useCallback((): void => {
+    // Header groups attach to the first profile present in the list (groups
+    // are per-profile); fall back to "default" for an empty list.
+    const profile = sessions[0]?.profile ?? "default";
+    setNewGroupName("");
+    setNewGroupCtx({ profile, target: "header" });
+  }, [sessions]);
+
+  const closeNewGroup = useCallback((): void => setNewGroupCtx(null), []);
+
+  const submitNewGroup = useCallback((): void => {
+    const ctx = newGroupCtx;
+    const name = newGroupName.trim();
+    if (!ctx || !name) return;
+    void (async () => {
+      const created = await window.hermesAPI.createSessionGroup(
+        ctx.profile,
+        name,
+      );
+      if (created) {
+        await loadGroups();
+        if (ctx.target !== "header") {
+          patchSession(ctx.target.id, { groupId: created.id });
           void window.hermesAPI.moveSessionToGroup(
-            s.profile,
-            s.id,
+            ctx.profile,
+            ctx.target.id,
             created.id,
           );
         }
-      })();
-    },
-    [t, loadGroups, patchSession],
-  );
+        setFilterGroup(created.id);
+      }
+      setNewGroupCtx(null);
+    })();
+  }, [newGroupCtx, newGroupName, loadGroups, patchSession]);
 
   // ---- rename ----
   const startRename = useCallback((s: SessionRow): void => {
@@ -811,6 +967,12 @@ function Sessions({
     if (deletingBulk) return;
     setPendingBulkDelete(null);
   }, [deletingBulk]);
+
+  // Focus management for the three modals: trap Tab inside, Escape closes,
+  // focus returns to the opener on close (WCAG 2.4.3 / 2.1.2).
+  useFocusTrap(!!pendingDelete, deleteModalRef, cancelDelete);
+  useFocusTrap(!!pendingBulkDelete, bulkDeleteModalRef, cancelBulkDelete);
+  useFocusTrap(!!newGroupCtx, newGroupModalRef, closeNewGroup);
 
   const confirmBulkDelete = useCallback(
     async (rows: SessionRow[]): Promise<void> => {
@@ -970,7 +1132,11 @@ function Sessions({
     onRenameCancel: cancelRename,
   };
 
-  const renderCard = (s: SessionRow, showFullDate: boolean): React.JSX.Element => (
+  const renderCard = (
+    s: SessionRow,
+    showFullDate: boolean,
+    snippet?: React.ReactNode,
+  ): React.JSX.Element => (
     <SessionCard
       key={s.id}
       session={s}
@@ -981,6 +1147,7 @@ function Sessions({
       renameValue={editingTitle}
       onRenameConfirm={() => confirmRename(s.id, editingTitle)}
       selected={selectedSessionIds.has(s.id)}
+      snippet={snippet}
       {...cardActionProps}
     />
   );
@@ -1016,6 +1183,15 @@ function Sessions({
                 ))}
               </select>
             )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleNewGroupFromHeader}
+              disabled={loading}
+            >
+              <Plus size={14} />
+              {t("sessions.newGroup")}
+            </button>
             <button
               type="button"
               className="btn btn-secondary sessions-select-mode"
@@ -1108,31 +1284,33 @@ function Sessions({
             >
               {t("sessions.resultCount", { count: searchResults.length })}
             </div>
-            {groupSessions(searchResults).map((group) => (
-              <div key={group.label} className="sessions-group">
-                <div className="sessions-group-label">
-                  {t(`sessions.${group.label}`)}
-                </div>
-                {group.sessions.map((s) => {
-                  const r = s as SearchRow;
-                  return (
-                    <div key={r.id} className="sessions-search-row">
-                      {renderCard(r, true)}
-                      {r.title && r.snippet && (
+            {groupSessions(searchResults).map((group) => {
+              const labelId = `sessions-search-grp-${group.label}`;
+              return (
+                <section
+                  key={group.label}
+                  className="sessions-group"
+                  aria-labelledby={labelId}
+                >
+                  <h3 id={labelId} className="sessions-group-label">
+                    {t(`sessions.${group.label}`)}
+                  </h3>
+                  <ul className="sessions-card-list" role="list">
+                    {group.sessions.map((s) => {
+                      const r = s as SearchRow;
+                      const snippet = r.snippet ? (
                         <div className="sessions-result-snippet">
-                          {highlightSnippet(r.snippet)}
+                          {r.title
+                            ? highlightSnippet(r.snippet)
+                            : cleanSearchSnippet(r.snippet)}
                         </div>
-                      )}
-                      {!r.title && r.snippet && (
-                        <div className="sessions-result-snippet">
-                          {cleanSearchSnippet(r.snippet)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+                      ) : undefined;
+                      return renderCard(r, true, snippet);
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
           </div>
         )
       ) : filtered.length === 0 ? (
@@ -1144,26 +1322,40 @@ function Sessions({
       ) : (
         <div className="sessions-list">
           {pinned.length > 0 && (
-            <div className="sessions-group">
-              <div className="sessions-group-label">
+            <section
+              className="sessions-group"
+              aria-labelledby="sessions-grp-pinned"
+            >
+              <h3 id="sessions-grp-pinned" className="sessions-group-label">
                 {t("sessions.pinnedSection")}
-              </div>
-              {pinned.map((s) => renderCard(s, true))}
-            </div>
+              </h3>
+              <ul className="sessions-card-list" role="list">
+                {pinned.map((s) => renderCard(s, true))}
+              </ul>
+            </section>
           )}
-          {grouped.map((group) => (
-            <div key={group.label} className="sessions-group">
-              <div className="sessions-group-label">
-                {t(`sessions.${group.label}`)}
-              </div>
-              {group.sessions.map((s) =>
-                renderCard(
-                  s,
-                  group.label === "thisWeek" || group.label === "earlier",
-                ),
-              )}
-            </div>
-          ))}
+          {grouped.map((group) => {
+            const labelId = `sessions-grp-${group.label}`;
+            return (
+              <section
+                key={group.label}
+                className="sessions-group"
+                aria-labelledby={labelId}
+              >
+                <h3 id={labelId} className="sessions-group-label">
+                  {t(`sessions.${group.label}`)}
+                </h3>
+                <ul className="sessions-card-list" role="list">
+                  {group.sessions.map((s) =>
+                    renderCard(
+                      s,
+                      group.label === "thisWeek" || group.label === "earlier",
+                    ),
+                  )}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -1174,6 +1366,7 @@ function Sessions({
           role="presentation"
         >
           <div
+            ref={deleteModalRef}
             className="sessions-confirm-modal"
             role="dialog"
             aria-modal="true"
@@ -1228,6 +1421,7 @@ function Sessions({
           role="presentation"
         >
           <div
+            ref={bulkDeleteModalRef}
             className="sessions-confirm-modal"
             role="dialog"
             aria-modal="true"
@@ -1273,6 +1467,75 @@ function Sessions({
                 {deletingBulk
                   ? t("sessions.deleteDeleting")
                   : t("sessions.deleteConfirmAction")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newGroupCtx && (
+        <div
+          className="sessions-confirm-overlay"
+          onClick={closeNewGroup}
+          role="presentation"
+        >
+          <div
+            ref={newGroupModalRef}
+            className="sessions-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sessions-newgroup-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sessions-confirm-header">
+              <h3 id="sessions-newgroup-title">{t("sessions.newGroupTitle")}</h3>
+              <button
+                type="button"
+                className="btn-ghost sessions-confirm-close"
+                onClick={closeNewGroup}
+                aria-label={t("sessions.deleteCancel")}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="sessions-confirm-body">
+              <label
+                htmlFor="sessions-newgroup-input"
+                className="sessions-newgroup-label"
+              >
+                {t("sessions.newGroupPrompt")}
+              </label>
+              <input
+                id="sessions-newgroup-input"
+                ref={newGroupInputRef}
+                className="sessions-newgroup-input"
+                type="text"
+                value={newGroupName}
+                placeholder={t("sessions.newGroupPlaceholder")}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitNewGroup();
+                  }
+                }}
+              />
+            </div>
+            <div className="sessions-confirm-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={closeNewGroup}
+              >
+                {t("sessions.deleteCancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={submitNewGroup}
+                disabled={!newGroupName.trim()}
+              >
+                {t("sessions.newGroupCreate")}
               </button>
             </div>
           </div>

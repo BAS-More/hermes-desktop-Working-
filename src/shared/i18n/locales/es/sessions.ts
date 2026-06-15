@@ -44,7 +44,10 @@ export default {
   allGroups: "Todos los grupos",
   noGroup: "Sin grupo",
   newGroup: "Nuevo grupo…",
+  newGroupTitle: "Nuevo grupo",
   newGroupPrompt: "Nombre del nuevo grupo:",
+  newGroupPlaceholder: "p. ej. Migración",
+  newGroupCreate: "Crear grupo",
   deleteGroup: "Eliminar grupo",
   deleteGroupConfirm:
     "¿Eliminar este grupo? Las sesiones volverán a 'Sin grupo'.",
