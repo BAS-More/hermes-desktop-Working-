@@ -1,6 +1,6 @@
 // Mirror of the engine's `hermes kanban govern --json` document.
 // Shared between the Factory tab (screens/Factory/Factory.tsx) and the in-chat
-// Factory panel (screens/Chat/FactoryPanel.tsx + hooks/useFactoryStatus.ts) so
+// Factory panel (screens/Chat/FactoryPanel.tsx + shared/useFactoryStatus.ts) so
 // the shape has a single source of truth.
 
 export interface GovernProfileState {

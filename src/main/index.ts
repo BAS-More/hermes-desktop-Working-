@@ -142,11 +142,28 @@ import {
   searchSessions,
   deleteSession,
   deleteSessions,
+  listAllSessions,
+  searchAllSessions,
+  getSessionMessagesFromProfile,
+  deleteSessionInProfile,
+  deleteSessionsByProfile,
+  renameSessionInProfile,
+  setSessionArchived,
+  setSessionPinned,
+  setSessionStatus,
+  moveSessionToGroup,
+  listAllSessionGroups,
+  createSessionGroup,
+  deleteSessionGroup,
+  type SessionStatus,
 } from "./sessions";
 import {
   syncSessionCache,
   listCachedSessions,
   updateSessionTitle,
+  syncAllSessionCaches,
+  updateSessionTitleInProfile,
+  removeSessionFromProfileCache,
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
 import { validateChatReadiness } from "./validation";
@@ -1676,6 +1693,100 @@ function setupIPC(): void {
       return sshSearchSessions(conn.ssh, query, limit);
     return searchSessions(query, limit);
   });
+
+  // --- Multi-profile session aggregation + desktop session metadata ---
+  // SSH remains single-profile: fall back to the existing remote helpers so
+  // the aggregator routes degrade gracefully under a pure-HTTP/SSH connection.
+  ipcMain.handle("list-all-sessions", (_event, limit?: number) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh)
+      return sshListCachedSessions(conn.ssh, limit ?? 200);
+    return listAllSessions(limit);
+  });
+  ipcMain.handle("sync-all-session-caches", () => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh)
+      return sshListCachedSessions(conn.ssh, 200);
+    try {
+      syncAllSessionCaches();
+    } catch (error) {
+      console.error("sync-all-session-caches failed", error);
+    }
+    return listAllSessions(200);
+  });
+  ipcMain.handle(
+    "search-all-sessions",
+    (_event, query: string, limit?: number) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshSearchSessions(conn.ssh, query, limit);
+      return searchAllSessions(query, limit);
+    },
+  );
+  ipcMain.handle(
+    "get-session-messages-from-profile",
+    (_event, profile: string, sessionId: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshGetSessionMessages(conn.ssh, sessionId);
+      return getSessionMessagesFromProfile(profile, sessionId);
+    },
+  );
+  ipcMain.handle(
+    "delete-session-in-profile",
+    (_event, profile: string, sessionId: string) => {
+      deleteSessionInProfile(profile, sessionId);
+      removeSessionFromProfileCache(profile, sessionId);
+    },
+  );
+  ipcMain.handle(
+    "delete-sessions-by-profile",
+    (_event, byProfile: Record<string, string[]>) => {
+      const result = deleteSessionsByProfile(byProfile || {});
+      for (const [profile, ids] of Object.entries(byProfile || {})) {
+        for (const id of ids) removeSessionFromProfileCache(profile, id);
+      }
+      return result;
+    },
+  );
+  ipcMain.handle(
+    "rename-session",
+    (_event, profile: string, sessionId: string, title: string) => {
+      renameSessionInProfile(profile, sessionId, title);
+      updateSessionTitleInProfile(profile, sessionId, title);
+    },
+  );
+  ipcMain.handle(
+    "set-session-archived",
+    (_event, profile: string, sessionId: string, archived: boolean) =>
+      setSessionArchived(profile, sessionId, archived),
+  );
+  ipcMain.handle(
+    "set-session-pinned",
+    (_event, profile: string, sessionId: string, pinned: boolean) =>
+      setSessionPinned(profile, sessionId, pinned),
+  );
+  ipcMain.handle(
+    "set-session-status",
+    (_event, profile: string, sessionId: string, status: SessionStatus) =>
+      setSessionStatus(profile, sessionId, status),
+  );
+  ipcMain.handle(
+    "move-session-to-group",
+    (_event, profile: string, sessionId: string, groupId: string | null) =>
+      moveSessionToGroup(profile, sessionId, groupId),
+  );
+  ipcMain.handle("list-session-groups", () => listAllSessionGroups());
+  ipcMain.handle(
+    "create-session-group",
+    (_event, profile: string, name: string, color?: string | null) =>
+      createSessionGroup(profile, name, color),
+  );
+  ipcMain.handle(
+    "delete-session-group",
+    (_event, profile: string, groupId: string) =>
+      deleteSessionGroup(profile, groupId),
+  );
 
   // Credential Pool — profile-aware. When `profile` is omitted, the
   // credential pool helpers default to the currently active profile's

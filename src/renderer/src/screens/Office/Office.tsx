@@ -4,8 +4,13 @@ import { useI18n } from "../../components/useI18n";
 import oneChatIcon from "../../assets/images/one-chat.svg";
 import OneChatModal from "./OneChatModal";
 import Office3D from "./office3d/Office3D";
-import { profilesToOfficeAgents } from "./office3d/agents";
+import {
+  profilesToOfficeAgents,
+  enrichOfficeAgentsWithBuilds,
+  CELEBRATE_DURATION_MS,
+} from "./office3d/agents";
 import type { OfficeAgent } from "./office3d/core/types";
+import { useFactoryStatus } from "../shared/useFactoryStatus";
 
 interface OfficeProps {
   profile?: string;
@@ -53,6 +58,16 @@ function Office({ visible }: OfficeProps): React.JSX.Element {
   // Avoid refetching every time the tab regains visibility within a session;
   // only the first reveal and explicit refreshes hit IPC.
   const loadedOnce = useRef(false);
+
+  // Live factory state — drives the bots: an orchestrator's bot works while its
+  // build runs, dances when a build finishes, turns red when a build escalates.
+  // Polls only while the Office tab is visible (the hook gates on `active`).
+  const factory = useFactoryStatus(Boolean(visible));
+  // Builds whose completion we've already celebrated, so the dance fires once.
+  const celebratedRef = useRef<Set<string>>(new Set());
+  // Active celebrations: build root_id → dance deadline (ms). Drives the pure
+  // enrichment below. Entries are pruned once expired.
+  const [celebrations, setCelebrations] = useState<Record<string, number>>({});
 
   const loadAgents = useCallback(async () => {
     setLoading(true);
@@ -127,15 +142,53 @@ function Office({ visible }: OfficeProps): React.JSX.Element {
     if (ceoId && !agents.some((a) => a.id === ceoId)) setCeo(null);
   }, [loading, agents, ceoId, setCeo]);
 
+  // Watch the factory status for newly-completed builds and start a
+  // celebration. The "first time seen as done" check uses a ref so React
+  // StrictMode's double-invocation doesn't fire the dance twice; mutating a
+  // ref inside an effect is the safe place to do it.
+  useEffect(() => {
+    const builds = factory.status?.builds ?? [];
+    if (builds.length === 0) return;
+    const seen = celebratedRef.current;
+    const fresh: Record<string, number> = {};
+    const deadline = Date.now() + CELEBRATE_DURATION_MS;
+    for (const b of builds) {
+      if (b.loop_state !== "done") continue;
+      if (!b.root_id || seen.has(b.root_id)) continue;
+      seen.add(b.root_id);
+      fresh[b.root_id] = deadline;
+    }
+    if (Object.keys(fresh).length === 0) return;
+    setCelebrations((prev) => ({ ...prev, ...fresh }));
+    // Schedule a cleanup pass once the latest deadline has passed so the map
+    // doesn't grow unbounded across long sessions. The agents stop showing
+    // celebrateUntil naturally; this just trims memory.
+    const trim = setTimeout(() => {
+      setCelebrations((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next: Record<string, number> = {};
+        for (const [id, until] of Object.entries(prev)) {
+          if (until > now) next[id] = until;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, CELEBRATE_DURATION_MS + 250);
+    return () => clearTimeout(trim);
+  }, [factory.status]);
+
   // Tag each agent with its org position; the CEO drives the executive desk.
-  const positionedAgents = useMemo<OfficeAgent[]>(
-    () =>
-      agents.map((a) => ({
-        ...a,
-        position: a.id === ceoId ? "ceo" : "employee",
-      })),
-    [agents, ceoId],
-  );
+  // Then overlay factory state — completed builds make the orchestrator's bot
+  // dance, escalated builds flip its status to error. Pure: re-runs only when
+  // its inputs change, and never mutates any ref/state inline.
+  const positionedAgents = useMemo<OfficeAgent[]>(() => {
+    const positioned: OfficeAgent[] = agents.map((a) => ({
+      ...a,
+      position: a.id === ceoId ? "ceo" : "employee",
+    }));
+    return enrichOfficeAgentsWithBuilds(positioned, factory.status, celebrations);
+  }, [agents, ceoId, factory.status, celebrations]);
 
   const selectedAgent =
     positionedAgents.find((a) => a.id === selectedId) ?? null;

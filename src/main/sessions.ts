@@ -1,6 +1,10 @@
 import Database from "better-sqlite3";
 import { existsSync } from "fs";
-import { activeStateDbPath } from "./utils";
+import {
+  activeStateDbPath,
+  stateDbPathForProfile,
+  listAllStateDbPaths,
+} from "./utils";
 import type { Attachment } from "../shared/attachments";
 import { isImageMime } from "../shared/attachments";
 import { clearStagedAttachments } from "./attachment-staging";
@@ -693,4 +697,634 @@ export function deleteSessions(sessionIds: string[]): DeleteSessionsResult {
   }
 
   return { requested: ids.length, deleted };
+}
+
+// ===========================================================================
+// Multi-profile aggregation + desktop-owned session metadata (issue: sessions
+// disappeared because the desktop only read the active profile's state.db).
+//
+// Sessions live per-profile on disk. The desktop now lists across every
+// profile DB and tags each row with its profile so resume/rename/delete can
+// reopen the right DB. Extra UI state the engine doesn't model — pin, paused/
+// complete status, and groups — is stored in two desktop-owned tables created
+// lazily in each profile's state.db. They never collide with engine writes.
+// ===========================================================================
+
+export type SessionStatus = "active" | "paused" | "complete";
+
+export interface SessionMeta {
+  pinned: boolean;
+  status: SessionStatus;
+  groupId: string | null;
+  pinnedAt: number | null;
+}
+
+export interface SessionGroup {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  createdAt: number;
+}
+
+export interface AggregatedSession {
+  id: string;
+  profile: string;
+  title: string | null;
+  startedAt: number;
+  source: string;
+  messageCount: number;
+  model: string;
+  archived: boolean;
+  pinned: boolean;
+  status: SessionStatus;
+  groupId: string | null;
+}
+
+export interface AggregatedSearchResult extends AggregatedSession {
+  snippet: string;
+}
+
+const DEFAULT_META: SessionMeta = {
+  pinned: false,
+  status: "active",
+  groupId: null,
+  pinnedAt: null,
+};
+
+/**
+ * Create the desktop-owned metadata tables if absent. Idempotent — safe to
+ * call on every DB open. These tables are additive and desktop-private; the
+ * engine never reads or writes them.
+ */
+export function ensureDesktopSessionTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS desktop_session_meta (
+      session_id  TEXT PRIMARY KEY,
+      pinned      INTEGER NOT NULL DEFAULT 0,
+      status      TEXT NOT NULL DEFAULT 'active'
+                    CHECK(status IN ('active','paused','complete')),
+      group_id    TEXT,
+      group_order INTEGER,
+      pinned_at   REAL
+    );
+    CREATE TABLE IF NOT EXISTS desktop_session_group (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      color      TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at REAL NOT NULL
+    );
+  `);
+}
+
+/** Open a writable DB for a profile, ensuring desktop tables exist. */
+function openProfileDb(
+  profile: string,
+  readonly: boolean,
+): Database.Database | null {
+  const dbPath = stateDbPathForProfile(profile);
+  if (!existsSync(dbPath)) return null;
+  // Always open writable once to ensure the desktop tables exist, even for a
+  // "readonly" caller — a readonly handle can't CREATE TABLE. We open writable,
+  // ensure, and (for readonly callers) keep using it since better-sqlite3
+  // gives no cheap downgrade; the cost is negligible and reads still work.
+  const db = new Database(dbPath, readonly ? {} : {});
+  try {
+    ensureDesktopSessionTables(db);
+  } catch {
+    // If the schema can't be created (e.g. a corrupt DB) the meta-aware reads
+    // below fall back to defaults via try/catch, so don't fail the open.
+  }
+  return db;
+}
+
+function rowToMeta(row: {
+  pinned: number | null;
+  status: string | null;
+  group_id: string | null;
+  pinned_at: number | null;
+}): SessionMeta {
+  const status =
+    row.status === "paused" || row.status === "complete"
+      ? row.status
+      : "active";
+  return {
+    pinned: !!row.pinned,
+    status,
+    groupId: row.group_id ?? null,
+    pinnedAt: row.pinned_at ?? null,
+  };
+}
+
+/** Read desktop meta for all sessions in one DB, keyed by session id. */
+function readAllMeta(db: Database.Database): Map<string, SessionMeta> {
+  const map = new Map<string, SessionMeta>();
+  try {
+    const rows = db
+      .prepare(
+        `SELECT session_id, pinned, status, group_id, pinned_at
+         FROM desktop_session_meta`,
+      )
+      .all() as Array<{
+      session_id: string;
+      pinned: number | null;
+      status: string | null;
+      group_id: string | null;
+      pinned_at: number | null;
+    }>;
+    for (const r of rows) map.set(r.session_id, rowToMeta(r));
+  } catch {
+    // table missing / unreadable — every session uses defaults
+  }
+  return map;
+}
+
+/** Does this DB's sessions table carry an `archived` column? (older DBs may not) */
+function hasArchivedColumn(db: Database.Database): boolean {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(sessions)`).all() as Array<{
+      name: string;
+    }>;
+    return cols.some((c) => c.name === "archived");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * List sessions across every profile DB, tagged with profile + desktop meta.
+ * Best-effort: a DB that fails to open is skipped (the corrupted pre-update
+ * snapshot, for instance) rather than crashing the whole list.
+ */
+export function listAllSessions(limit = 200): AggregatedSession[] {
+  const all: AggregatedSession[] = [];
+  for (const { profile, dbPath } of listAllStateDbPaths()) {
+    let db: Database.Database | null = null;
+    try {
+      db = new Database(dbPath, { readonly: true });
+      const archived = hasArchivedColumn(db);
+      const rows = db
+        .prepare(
+          `SELECT s.id, s.source, s.started_at, s.message_count, s.model, s.title
+             ${archived ? ", s.archived" : ""}
+           FROM sessions s
+           ORDER BY s.started_at DESC
+           LIMIT ?`,
+        )
+        .all(limit) as Array<{
+        id: string;
+        source: string;
+        started_at: number;
+        message_count: number;
+        model: string;
+        title: string | null;
+        archived?: number;
+      }>;
+      const meta = readAllMeta(db);
+      for (const r of rows) {
+        const m = meta.get(r.id) ?? DEFAULT_META;
+        all.push({
+          id: r.id,
+          profile,
+          title: r.title,
+          startedAt: r.started_at,
+          source: r.source,
+          messageCount: r.message_count,
+          model: r.model || "",
+          archived: !!r.archived,
+          pinned: m.pinned,
+          status: m.status,
+          groupId: m.groupId,
+        });
+      }
+    } catch (err) {
+      console.error(`listAllSessions: skipping ${dbPath}`, err);
+    } finally {
+      db?.close();
+    }
+  }
+  all.sort((a, b) => b.startedAt - a.startedAt);
+  return all.slice(0, limit);
+}
+
+/** Search across every profile DB; reuses the single-DB searchSessions logic. */
+export function searchAllSessions(
+  query: string,
+  limit = 20,
+): AggregatedSearchResult[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const all: AggregatedSearchResult[] = [];
+  for (const { profile, dbPath } of listAllStateDbPaths()) {
+    let db: Database.Database | null = null;
+    try {
+      db = new Database(dbPath, { readonly: true });
+      const meta = readAllMeta(db);
+      const archived = hasArchivedColumn(db);
+      // Reuse the proven single-DB search by temporarily pointing at this DB.
+      const results = searchSessionsInDb(db, trimmed, limit, archived);
+      for (const r of results) {
+        const m = meta.get(r.sessionId) ?? DEFAULT_META;
+        all.push({
+          id: r.sessionId,
+          profile,
+          title: r.title,
+          startedAt: r.startedAt,
+          source: r.source,
+          messageCount: r.messageCount,
+          model: r.model,
+          archived: r.archived,
+          pinned: m.pinned,
+          status: m.status,
+          groupId: m.groupId,
+          snippet: r.snippet,
+        });
+      }
+    } catch (err) {
+      console.error(`searchAllSessions: skipping ${dbPath}`, err);
+    } finally {
+      db?.close();
+    }
+  }
+  // Title/FTS matches already ranked per-DB; across DBs sort by recency.
+  all.sort((a, b) => b.startedAt - a.startedAt);
+  return all.slice(0, limit);
+}
+
+/**
+ * Single-DB search body shared by the aggregator. Mirrors `searchSessions`
+ * but takes an already-open DB so the aggregator opens each DB once. Returns
+ * an `archived` flag per row when the column exists.
+ */
+function searchSessionsInDb(
+  db: Database.Database,
+  trimmedQuery: string,
+  limit: number,
+  archived: boolean,
+): Array<SearchResult & { archived: boolean }> {
+  const titleRows = db
+    .prepare(
+      `SELECT s.id as session_id, s.title, s.started_at, s.source,
+              s.message_count, s.model ${archived ? ", s.archived" : ""}
+       FROM sessions s
+       WHERE LOWER(COALESCE(s.title, '')) LIKE ? ESCAPE '\\'
+         OR LOWER(s.id) LIKE ? ESCAPE '\\'
+       ORDER BY s.started_at DESC
+       LIMIT ?`,
+    )
+    .all(
+      `%${escapeLikePattern(trimmedQuery.toLocaleLowerCase())}%`,
+      `%${escapeLikePattern(trimmedQuery.toLocaleLowerCase())}%`,
+      limit,
+    ) as Array<{
+    session_id: string;
+    title: string | null;
+    started_at: number;
+    source: string;
+    message_count: number;
+    model: string;
+    archived?: number;
+  }>;
+
+  const titleMatches = titleRows.map((r) => ({
+    ...r,
+    snippet: highlightSessionMatch(r.title, r.session_id, trimmedQuery),
+  }));
+
+  const tableCheck = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='messages_fts'",
+    )
+    .get() as { name: string } | undefined;
+
+  const sanitized = trimmedQuery
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .map((w) => `"${w.replace(/"/g, "")}"*`)
+    .join(" ");
+
+  const ftsRows = tableCheck
+    ? (db
+        .prepare(
+          `SELECT DISTINCT m.session_id, s.title, s.started_at, s.source,
+                  s.message_count, s.model ${archived ? ", s.archived" : ""},
+                  snippet(messages_fts, 0, '<<', '>>', '...', 40) as snippet
+           FROM messages_fts
+           JOIN messages m ON m.id = messages_fts.rowid
+           JOIN sessions s ON s.id = m.session_id
+           WHERE messages_fts MATCH ?
+           ORDER BY rank
+           LIMIT ?`,
+        )
+        .all(sanitized, Math.max(limit * 5, limit)) as Array<{
+        session_id: string;
+        title: string | null;
+        started_at: number;
+        source: string;
+        message_count: number;
+        model: string;
+        archived?: number;
+        snippet: string;
+      }>)
+    : [];
+
+  const uniqueRows = dedupeSearchRowsBySession(
+    [...titleMatches, ...ftsRows],
+    limit,
+  );
+  return uniqueRows.map((r) => ({
+    sessionId: r.session_id,
+    title: r.title,
+    startedAt: r.started_at,
+    source: r.source,
+    messageCount: r.message_count,
+    model: r.model || "",
+    snippet: r.snippet || "",
+    archived: !!r.archived,
+  }));
+}
+
+/** Resume a session from a specific profile's DB (not the active-profile file). */
+export function getSessionMessagesFromProfile(
+  profile: string,
+  sessionId: string,
+): HistoryItem[] {
+  const dbPath = stateDbPathForProfile(profile);
+  if (!existsSync(dbPath)) return [];
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    const rows = db
+      .prepare(
+        `SELECT id, role, content, timestamp,
+                tool_call_id, tool_calls, tool_name,
+                reasoning, reasoning_content, reasoning_details
+         FROM messages
+         WHERE session_id = ? AND role IN ('user', 'assistant', 'tool')
+         ORDER BY timestamp, id`,
+      )
+      .all(sessionId) as RawMessageRow[];
+    const items = expandRowsToHistory(rows);
+    return mergeStoredPromptImageAttachments(
+      items,
+      loadPromptImageAttachments(db, sessionId),
+    );
+  } finally {
+    db.close();
+  }
+}
+
+/** Hard-delete a session from a specific profile's DB. */
+export function deleteSessionInProfile(
+  profile: string,
+  sessionId: string,
+): void {
+  const id = normalizeSessionIds([sessionId])[0];
+  if (!id) return;
+  const dbPath = stateDbPathForProfile(profile);
+  if (existsSync(dbPath)) {
+    const db = new Database(dbPath);
+    try {
+      const tx = db.transaction((sid: string) => {
+        deleteSessionRows(db, sid);
+        try {
+          db.prepare("DELETE FROM desktop_session_meta WHERE session_id = ?").run(
+            sid,
+          );
+        } catch {
+          /* meta table may not exist */
+        }
+      });
+      tx(id);
+    } finally {
+      db.close();
+    }
+  }
+  cleanupDeletedSession(id);
+}
+
+/** Bulk-delete sessions grouped by profile. */
+export function deleteSessionsByProfile(
+  byProfile: Record<string, string[]>,
+): DeleteSessionsResult {
+  let requested = 0;
+  let deleted = 0;
+  for (const [profile, ids] of Object.entries(byProfile)) {
+    const norm = normalizeSessionIds(ids);
+    requested += norm.length;
+    const dbPath = stateDbPathForProfile(profile);
+    if (existsSync(dbPath)) {
+      const db = new Database(dbPath);
+      try {
+        const tx = db.transaction((list: string[]) => {
+          for (const id of list) {
+            deleted += deleteSessionRows(db, id);
+            try {
+              db.prepare(
+                "DELETE FROM desktop_session_meta WHERE session_id = ?",
+              ).run(id);
+            } catch {
+              /* meta table may not exist */
+            }
+          }
+        });
+        tx(norm);
+      } finally {
+        db.close();
+      }
+    }
+    for (const id of norm) cleanupDeletedSession(id);
+  }
+  return { requested, deleted };
+}
+
+/** Rename a session's title in a specific profile's DB. */
+export function renameSessionInProfile(
+  profile: string,
+  sessionId: string,
+  title: string,
+): void {
+  const dbPath = stateDbPathForProfile(profile);
+  if (!existsSync(dbPath)) return;
+  const db = new Database(dbPath);
+  try {
+    db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(
+      title,
+      sessionId,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+/** Flip a session's engine-side `archived` flag in a specific profile's DB. */
+export function setSessionArchived(
+  profile: string,
+  sessionId: string,
+  archived: boolean,
+): void {
+  const dbPath = stateDbPathForProfile(profile);
+  if (!existsSync(dbPath)) return;
+  const db = new Database(dbPath);
+  try {
+    if (!hasArchivedColumn(db)) return; // older DB without the column
+    db.prepare("UPDATE sessions SET archived = ? WHERE id = ?").run(
+      archived ? 1 : 0,
+      sessionId,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+function upsertMeta(
+  profile: string,
+  sessionId: string,
+  patch: Partial<{
+    pinned: boolean;
+    status: SessionStatus;
+    groupId: string | null;
+    pinnedAt: number | null;
+  }>,
+): void {
+  const db = openProfileDb(profile, false);
+  if (!db) return;
+  try {
+    // Insert a default row if absent, then patch the requested columns.
+    db.prepare(
+      `INSERT OR IGNORE INTO desktop_session_meta (session_id) VALUES (?)`,
+    ).run(sessionId);
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (patch.pinned !== undefined) {
+      sets.push("pinned = ?");
+      vals.push(patch.pinned ? 1 : 0);
+      sets.push("pinned_at = ?");
+      vals.push(patch.pinned ? Date.now() / 1000 : null);
+    }
+    if (patch.status !== undefined) {
+      sets.push("status = ?");
+      vals.push(patch.status);
+    }
+    if (patch.groupId !== undefined) {
+      sets.push("group_id = ?");
+      vals.push(patch.groupId);
+    }
+    if (sets.length === 0) return;
+    vals.push(sessionId);
+    db.prepare(
+      `UPDATE desktop_session_meta SET ${sets.join(", ")} WHERE session_id = ?`,
+    ).run(...vals);
+  } finally {
+    db.close();
+  }
+}
+
+export function setSessionPinned(
+  profile: string,
+  sessionId: string,
+  pinned: boolean,
+): void {
+  upsertMeta(profile, sessionId, { pinned });
+}
+
+export function setSessionStatus(
+  profile: string,
+  sessionId: string,
+  status: SessionStatus,
+): void {
+  upsertMeta(profile, sessionId, { status });
+}
+
+export function moveSessionToGroup(
+  profile: string,
+  sessionId: string,
+  groupId: string | null,
+): void {
+  upsertMeta(profile, sessionId, { groupId });
+}
+
+export function listSessionGroups(profile: string): SessionGroup[] {
+  const db = openProfileDb(profile, true);
+  if (!db) return [];
+  try {
+    const rows = db
+      .prepare(
+        `SELECT id, name, color, sort_order, created_at
+         FROM desktop_session_group ORDER BY sort_order, created_at`,
+      )
+      .all() as Array<{
+      id: string;
+      name: string;
+      color: string | null;
+      sort_order: number;
+      created_at: number;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      color: r.color,
+      sortOrder: r.sort_order,
+      createdAt: r.created_at,
+    }));
+  } catch {
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+/** Aggregate groups across all profiles (UI shows one group list). */
+export function listAllSessionGroups(): Array<SessionGroup & { profile: string }> {
+  const out: Array<SessionGroup & { profile: string }> = [];
+  for (const { profile } of listAllStateDbPaths()) {
+    for (const g of listSessionGroups(profile)) out.push({ ...g, profile });
+  }
+  return out;
+}
+
+export function createSessionGroup(
+  profile: string,
+  name: string,
+  color?: string | null,
+): SessionGroup | null {
+  const db = openProfileDb(profile, false);
+  if (!db) return null;
+  try {
+    const id = `grp-${Date.now().toString(36)}-${Math.floor(
+      Math.random() * 1e6,
+    ).toString(36)}`;
+    const createdAt = Date.now() / 1000;
+    const maxOrder = (
+      db.prepare(`SELECT MAX(sort_order) as m FROM desktop_session_group`).get() as
+        | { m: number | null }
+        | undefined
+    )?.m;
+    const sortOrder = (maxOrder ?? 0) + 1;
+    db.prepare(
+      `INSERT INTO desktop_session_group (id, name, color, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(id, name, color ?? null, sortOrder, createdAt);
+    return { id, name, color: color ?? null, sortOrder, createdAt };
+  } finally {
+    db.close();
+  }
+}
+
+export function deleteSessionGroup(profile: string, groupId: string): void {
+  const db = openProfileDb(profile, false);
+  if (!db) return;
+  try {
+    const tx = db.transaction((gid: string) => {
+      db.prepare("DELETE FROM desktop_session_group WHERE id = ?").run(gid);
+      // Un-group any sessions that pointed at it.
+      db.prepare(
+        "UPDATE desktop_session_meta SET group_id = NULL WHERE group_id = ?",
+      ).run(gid);
+    });
+    tx(groupId);
+  } finally {
+    db.close();
+  }
 }

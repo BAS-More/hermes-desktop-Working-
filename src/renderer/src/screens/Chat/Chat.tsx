@@ -9,7 +9,7 @@ import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
 import { FactoryToggle } from "./FactoryToggle";
 import { FactoryPanel } from "./FactoryPanel";
-import { useFactoryStatus } from "./hooks/useFactoryStatus";
+import { useFactoryStatus } from "../shared/useFactoryStatus";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
 import { useChatActions } from "./hooks/useChatActions";
@@ -57,6 +57,8 @@ interface ChatProps {
   onSessionIdChange?: (runId: string, sessionId: string | null) => void;
   /** Reports the first user message as a best-effort conversation title. */
   onTitleChange?: (runId: string, title: string) => void;
+  /** Focus a factory build's task in the Kanban tab (in-chat Factory panel). */
+  onNavigateToTask?: (taskId: string) => void;
 }
 
 function Chat({
@@ -71,6 +73,7 @@ function Chat({
   onLoadingChange,
   onSessionIdChange,
   onTitleChange,
+  onNavigateToTask,
 }: ChatProps): React.JSX.Element {
   const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>(
@@ -500,6 +503,7 @@ function Chat({
             loopOn={factory.loopOn}
             setLoop={factory.setLoop}
             onClose={() => setFactoryVisible(false)}
+            onNavigateToTask={onNavigateToTask}
           />
         )}
       </div>

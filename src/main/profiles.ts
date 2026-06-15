@@ -14,6 +14,7 @@ import {
   isValidNamedProfileName,
   isValidProfileName,
   pidIsAliveAs,
+  writeActiveProfileName,
   PROFILE_NAME_ERROR,
 } from "./utils";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
@@ -304,4 +305,11 @@ export function setActiveProfile(name: string): void {
   } catch {
     // ignore
   }
+
+  // Defensive mirror: write ~/.hermes/active_profile ourselves regardless of
+  // whether the CLI above succeeded. A missing active_profile file is exactly
+  // the regression that made the Sessions tab resolve to the empty default DB
+  // and hide every named-profile session — so we never rely solely on the CLI
+  // having written it.
+  writeActiveProfileName(name);
 }

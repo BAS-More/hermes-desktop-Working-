@@ -5,6 +5,7 @@ import { Circle, Spinner } from "../../assets/icons";
 interface RecentSession {
   id: string;
   title: string;
+  profile: string;
 }
 
 // ChatGPT-style recent list under the Sessions nav item.
@@ -22,7 +23,12 @@ const REFRESH_THROTTLE_MS = 5_000;
 function sameSessions(a: RecentSession[], b: RecentSession[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (a[i].id !== b[i].id || a[i].title !== b[i].title) return false;
+    if (
+      a[i].id !== b[i].id ||
+      a[i].title !== b[i].title ||
+      a[i].profile !== b[i].profile
+    )
+      return false;
   }
   return true;
 }
@@ -48,24 +54,34 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
   onSelect,
 }: {
   open: boolean;
-  /** Active profile — the list is per-profile, so switching forces a reload. */
+  /**
+   * Active profile — recency reorders when it changes, so a switch forces a
+   * reload. The list itself now aggregates across ALL profiles (so older
+   * named-profile sessions are reachable from the sidebar too).
+   */
   activeProfile: string;
   currentSessionId: string | null;
   /** Session ids of every run currently generating (multiple run at once). */
   loadingSessionIds: Set<string>;
   /** A session whose history is being fetched for resume (transient spinner). */
   resumingSessionId: string | null;
-  onSelect: (sessionId: string) => void;
+  onSelect: (sessionId: string, profile: string) => void;
 }): React.JSX.Element | null {
   const { t } = useI18n();
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const lastRefreshRef = useRef(0);
 
   const applySessions = useCallback(
-    (list: Array<{ id: string; title: string }>): void => {
+    (
+      list: Array<{ id: string; title: string | null; profile?: string }>,
+    ): void => {
       const next = list
         .slice(0, RECENT_SESSIONS_LIMIT)
-        .map(({ id, title }) => ({ id, title }));
+        .map(({ id, title, profile }) => ({
+          id,
+          title: title ?? "",
+          profile: profile ?? "default",
+        }));
       // Skip the state update (and re-render) when nothing changed — the
       // common case for periodic refreshes.
       setSessions((prev) => (sameSessions(prev, next) ? prev : next));
@@ -79,7 +95,7 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
       if (!force && now - lastRefreshRef.current < REFRESH_THROTTLE_MS) return;
       lastRefreshRef.current = now;
       try {
-        const synced = await window.hermesAPI.syncSessionCache();
+        const synced = await window.hermesAPI.syncAllSessionCaches();
         applySessions(synced);
       } catch {
         // keep whatever we had — the list is best-effort UI sugar
@@ -97,7 +113,7 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
     let cancelled = false;
     void (async () => {
       try {
-        const cached = await window.hermesAPI.listCachedSessions(
+        const cached = await window.hermesAPI.listAllSessions(
           RECENT_SESSIONS_LIMIT,
         );
         if (!cancelled && cached.length > 0) applySessions(cached);
@@ -106,7 +122,7 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
       }
       lastRefreshRef.current = Date.now();
       try {
-        const synced = await window.hermesAPI.syncSessionCache();
+        const synced = await window.hermesAPI.syncAllSessionCaches();
         if (!cancelled) applySessions(synced);
       } catch {
         // cache read above already painted something
@@ -173,7 +189,7 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
               key={s.id}
               type="button"
               className={`sidebar-recent-session ${active ? "active" : ""}`}
-              onClick={() => onSelect(s.id)}
+              onClick={() => onSelect(s.id, s.profile)}
               title={title}
               tabIndex={expanded ? 0 : -1}
             >

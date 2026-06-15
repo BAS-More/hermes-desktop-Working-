@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import type { GovernStatus } from "../../Factory/types";
+import type { GovernStatus } from "../Factory/types";
 
-// Same cadence as the Factory tab so the in-chat panel and the full tab stay
-// visually in sync.
+// Same cadence as the Factory tab so the in-chat panel, the Office scene, and
+// the full tab stay visually in sync.
 const REFRESH_MS = 15000;
 
 export interface UseFactoryStatusResult {
@@ -18,12 +18,14 @@ export interface UseFactoryStatusResult {
 }
 
 /**
- * Live read of the dev-factory governance status for the in-chat Factory panel.
+ * Live read of the dev-factory governance status. Shared by the in-chat
+ * Factory panel (screens/Chat) and the Office 3D scene (screens/Office) so
+ * both surfaces poll the engine on the same cadence and from one code path.
  *
  * Mirrors the load/poll logic in screens/Factory/Factory.tsx but is scoped to a
- * single `active` flag so it only polls the engine while the panel is open.
- * `setLoop` is optimistic: it flips local `loopOn`, calls the govern IPC, then
- * reloads; on failure it reverts and surfaces the error.
+ * single `active` flag so it only polls the engine while the consuming surface
+ * is visible. `setLoop` is optimistic: it flips local `loopOn`, calls the
+ * govern IPC, then reloads; on failure it reverts and surfaces the error.
  */
 export function useFactoryStatus(active: boolean): UseFactoryStatusResult {
   const [status, setStatus] = useState<GovernStatus | null>(null);

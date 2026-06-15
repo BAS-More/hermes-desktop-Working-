@@ -3,6 +3,7 @@ import { join, dirname, basename } from "path";
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
   unlinkSync,
@@ -196,6 +197,77 @@ export function getActiveProfileNameSync(): string {
  */
 export function activeStateDbPath(): string {
   return join(profileHome(getActiveProfileNameSync()), "state.db");
+}
+
+/**
+ * Resolve the session database for a *specific* profile by name. "default"
+ * (or empty) → ~/.hermes/state.db; named profiles →
+ * ~/.hermes/profiles/<name>/state.db. Used by the multi-profile Sessions
+ * aggregator for per-session operations (rename, archive, delete, resume)
+ * where the profile is known from the listing rather than the active-profile
+ * file (issue: sessions across profiles must each resolve to their own DB).
+ */
+export function stateDbPathForProfile(profile?: unknown): string {
+  return join(profileHome(profile), "state.db");
+}
+
+/**
+ * Enumerate every profile's session database that exists on disk: the root
+ * default profile (~/.hermes/state.db, reported as "default") plus each named
+ * profile under ~/.hermes/profiles/<name>/state.db.
+ *
+ * Only paths that actually exist are returned. This is the backbone of the
+ * Sessions aggregator: the desktop used to read just the active profile's DB,
+ * so when the active_profile file was missing it fell back to "default" and
+ * showed an empty list while real sessions sat in named-profile DBs.
+ */
+export function listAllStateDbPaths(): Array<{
+  profile: string;
+  dbPath: string;
+}> {
+  const out: Array<{ profile: string; dbPath: string }> = [];
+
+  // Root / default profile.
+  const rootDb = join(HERMES_HOME, "state.db");
+  if (existsSync(rootDb)) out.push({ profile: "default", dbPath: rootDb });
+
+  // Named profiles.
+  const profilesDir = join(HERMES_HOME, "profiles");
+  if (existsSync(profilesDir)) {
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(profilesDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name);
+    } catch {
+      entries = [];
+    }
+    for (const name of entries) {
+      if (!isValidNamedProfileName(name)) continue;
+      const dbPath = join(profilesDir, name, "state.db");
+      if (existsSync(dbPath)) out.push({ profile: name, dbPath });
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Persist the active profile name to ~/.hermes/active_profile. The engine's
+ * `hermes profile use` writes this file; the desktop mirrors it so a profile
+ * selected purely in the UI survives a relaunch (and so `activeStateDbPath`
+ * resolves correctly). A missing file is exactly the regression that hid all
+ * sessions, so the desktop writes it defensively on profile switch.
+ */
+export function writeActiveProfileName(profile: string): void {
+  try {
+    const name = profile && profile !== "default" ? profile.trim() : "default";
+    if (!existsSync(HERMES_HOME)) mkdirSync(HERMES_HOME, { recursive: true });
+    writeFileSync(join(HERMES_HOME, "active_profile"), name, "utf-8");
+  } catch {
+    // Best-effort — a write failure here only means the next launch may not
+    // restore this profile automatically; it is never fatal.
+  }
 }
 
 /**

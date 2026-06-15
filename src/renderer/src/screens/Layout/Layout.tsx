@@ -432,7 +432,7 @@ function Layout({
   );
 
   const handleResumeSession = useCallback(
-    async (sessionId: string) => {
+    async (sessionId: string, sessionProfile?: string) => {
       // Already open as a live run? Re-attach to it (keeps live streaming).
       const live = findRunBySession(runs, sessionId);
       if (live) {
@@ -446,13 +446,23 @@ function Layout({
       resumingRef.current.add(sessionId);
       setResumingSessionId(sessionId);
       try {
-        const items = (await window.hermesAPI.getSessionMessages(
+        // Resolve which profile's state.db holds this session. If the caller
+        // didn't say (legacy code path), fall back to the active profile —
+        // safe for the default profile and for code that hasn't been updated.
+        const targetProfile = sessionProfile || activeProfile;
+        const items = (await window.hermesAPI.getSessionMessagesFromProfile(
+          targetProfile,
           sessionId,
-        )) as DbHistoryItem[];
-        const run = mintRun(activeProfile, dbItemsToChatMessages(items));
+        )) as unknown as DbHistoryItem[];
+        const run = mintRun(targetProfile, dbItemsToChatMessages(items));
         run.sessionId = sessionId;
         setRuns((prev) => [...prev, run]);
         setActiveRunId(run.runId);
+        // Switching active_profile is the critical correctness step — without
+        // it the resumed chat would run under the wrong profile's gateway.
+        if (targetProfile !== activeProfile) {
+          setActiveProfile(targetProfile);
+        }
         goTo("chat");
       } finally {
         resumingRef.current.delete(sessionId);
@@ -649,6 +659,7 @@ function Layout({
                 onLoadingChange={handleRunLoading}
                 onSessionIdChange={handleRunSessionId}
                 onTitleChange={handleRunTitle}
+                onNavigateToTask={focusKanbanTask}
               />
             </div>
           ))}

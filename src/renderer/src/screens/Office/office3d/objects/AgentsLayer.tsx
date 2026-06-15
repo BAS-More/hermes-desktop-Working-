@@ -140,7 +140,8 @@ export const AgentsLayer = memo(function AgentsLayer({
         if (
           !existing ||
           existing.status !== agent.status ||
-          existingPos !== agent.position
+          existingPos !== agent.position ||
+          existing.celebrateUntil !== agent.celebrateUntil
         ) {
           unchanged = false;
           break;
@@ -171,9 +172,19 @@ export const AgentsLayer = memo(function AgentsLayer({
     const step = Math.min(delta, 0.05); // clamp big frame gaps
     const liveAgents = (agentsRef as React.MutableRefObject<RenderAgent[]>)
       .current;
+    const now = performance.now() + performance.timeOrigin;
     for (const agent of liveAgents) {
       // eslint-disable-next-line -- simulation state is intentionally mutated in-place each frame
       agent.frame += step * 60;
+
+      // Factory celebration: when a tracked build finishes, the orchestrator's
+      // bot dances in place for a few seconds. This overrides the seat/rest
+      // routing so the win is visible no matter where the bot was. Once the
+      // deadline passes the controller below resumes normal seating.
+      if (agent.celebrateUntil && now < agent.celebrateUntil) {
+        agent.state = "dancing";
+        continue;
+      }
 
       // Working agents (gateway up) sit at their desk; everyone else rests in
       // the rest room.
