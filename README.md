@@ -5,7 +5,7 @@
   <a href="https://x.com/HermesOneApp"><img src="https://img.shields.io/badge/Follow Us-000000?style=for-the-badge&logo=x" alt="Twitter"></a>
   <a href="https://discord.gg/Fqu72h8z"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/fathah/hermes-desktop/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://hermesagents.cc/"><img src="https://img.shields.io/badge/Download-Releases-FF6600?style=for-the-badge" alt="Releases"></a>
+  <a href="https://hermesone.org"><img src="https://img.shields.io/badge/Download-Releases-FF6600?style=for-the-badge" alt="Releases"></a>
 <a href="https://github.com/fathah/hermes-desktop/stargazers">
   <img src="https://img.shields.io/github/stars/fathah/hermes-desktop?style=for-the-badge&color=FFD700&label=Stars" alt="Stars">
 </a>
@@ -52,7 +52,7 @@ Instead of managing the CLI by hand, the app walks through install, provider set
 
 ## Install
 
-<a href="https://hermesagents.cc/"><img width="380" alt="Download Now" src="previews/download.webp" /></a>
+<a href="https://hermesone.org"><img width="380" alt="Download Now" src="previews/download.webp" /></a>
 
 ### Windows
 
