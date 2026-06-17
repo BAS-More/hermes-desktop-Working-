@@ -37,7 +37,7 @@
   --code-bg: #1a1a1a;
   --scrollbar-thumb: #424242;
   --scrollbar-hover: #555555;
-  --selection: rgba(0, 63, 122, 0.4);
+  --selection: rgba(0, 100, 180, 0.7);
 }
 
 /* ----- Light Theme ----- */
@@ -72,7 +72,7 @@
   --code-bg: #f5f5f5;
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-hover: #bbbbbb;
-  --selection: rgba(0, 63, 122, 0.2);
+  --selection: rgba(0, 63, 122, 0.3);
 }
 
 /* ----- Dracula ----- */
@@ -107,7 +107,7 @@
   --code-bg: #21222c;
   --scrollbar-thumb: #44475a;
   --scrollbar-hover: #6272a4;
-  --selection: rgba(189, 147, 249, 0.35);
+  --selection: rgba(189, 147, 249, 0.7);
 }
 
 /* ----- Nord ----- */
@@ -142,7 +142,7 @@
   --code-bg: #272c36;
   --scrollbar-thumb: #434c5e;
   --scrollbar-hover: #4c566a;
-  --selection: rgba(136, 192, 208, 0.3);
+  --selection: rgba(136, 192, 208, 0.7);
 }
 
 /* ----- One Dark ----- */
@@ -177,7 +177,7 @@
   --code-bg: #21252b;
   --scrollbar-thumb: #3e4451;
   --scrollbar-hover: #4b5263;
-  --selection: rgba(97, 175, 239, 0.3);
+  --selection: rgba(97, 175, 239, 0.7);
 }
 
 /* ----- GitHub Dark ----- */
@@ -212,7 +212,7 @@
   --code-bg: #161b22;
   --scrollbar-thumb: #30363d;
   --scrollbar-hover: #484f58;
-  --selection: rgba(56, 139, 253, 0.3);
+  --selection: rgba(56, 139, 253, 0.7);
 }
 
 /* ----- Monokai ----- */
@@ -247,7 +247,7 @@
   --code-bg: #1e1f1c;
   --scrollbar-thumb: #49483e;
   --scrollbar-hover: #75715e;
-  --selection: rgba(102, 217, 239, 0.3);
+  --selection: rgba(102, 217, 239, 0.7);
 }
 
 /* ----- Solarized Dark ----- */
@@ -282,7 +282,7 @@
   --code-bg: #00252e;
   --scrollbar-thumb: #073642;
   --scrollbar-hover: #586e75;
-  --selection: rgba(38, 139, 210, 0.3);
+  --selection: rgba(38, 139, 210, 0.7);
 }
 
 /* ----- Gruvbox Dark ----- */
@@ -317,7 +317,7 @@
   --code-bg: #1d2021;
   --scrollbar-thumb: #504945;
   --scrollbar-hover: #665c54;
-  --selection: rgba(131, 165, 152, 0.3);
+  --selection: rgba(131, 165, 152, 0.7);
 }
 
 /* ----- Tokyo Night ----- */
@@ -352,7 +352,7 @@
   --code-bg: #16161e;
   --scrollbar-thumb: #343b58;
   --scrollbar-hover: #565f89;
-  --selection: rgba(122, 162, 247, 0.3);
+  --selection: rgba(122, 162, 247, 0.7);
 }
 
 /* ----- GitHub Light ----- */
@@ -387,7 +387,7 @@
   --code-bg: #f6f8fa;
   --scrollbar-thumb: #d0d7de;
   --scrollbar-hover: #afb8c1;
-  --selection: rgba(9, 105, 218, 0.2);
+  --selection: rgba(9, 105, 218, 0.3);
 }
 
 /* ----- Solarized Light ----- */
@@ -422,7 +422,7 @@
   --code-bg: #eee8d5;
   --scrollbar-thumb: #d3cbb0;
   --scrollbar-hover: #b9b393;
-  --selection: rgba(38, 139, 210, 0.2);
+  --selection: rgba(38, 139, 210, 0.3);
 }
 
 /* ----- Manrope ----- */
@@ -10331,6 +10331,14 @@ body {
 ::selection {
   background: var(--selection);
   color: var(--text-primary);
+}
+
+/* User bubbles have a blue background (#003f7a default) — the theme's
+   --selection color is also blue-toned and composites to nearly the same
+   shade on top of the user bubble.  Use a brighter sky-blue so the
+   selection highlight remains clearly visible on user messages. */
+.chat-bubble-user ::selection {
+  background: rgba(120, 190, 255, 0.7);
 }
 
 /* ========================================================================
