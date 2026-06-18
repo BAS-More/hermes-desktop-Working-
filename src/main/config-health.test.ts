@@ -64,7 +64,17 @@ const ORIGINAL_ENV = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 const TEST_HOME = join(tmpdir(), "hermes-config-health-unit");
 
 vi.mock("./installer", () => ({
-  HERMES_HOME: "/tmp/hermes-config-health-unit",
+  // HERMES_HOME must match the real TEST_HOME the beforeEach writes config.yaml
+  // and .env into, because config-health resolves paths via the REAL
+  // profilePaths(./utils) → profileHome → join(HERMES_HOME, ...) and checks them
+  // with the REAL existsSync (the "fs" mock in this file does not intercept
+  // config-health's import — verified: its existsSync is never called). On Linux
+  // a hardcoded "/tmp/hermes-config-health-unit" happened to equal
+  // join(tmpdir(), ...); on Windows tmpdir() is %TEMP% and join() yields
+  // backslashes, so the paths diverged and existsSync(configFile) returned false
+  // — silently gating off EMPTY_API_SERVER_KEY. Deriving from tmpdir() keeps the
+  // mock and the on-disk fixture in lockstep on every platform.
+  HERMES_HOME: join(tmpdir(), "hermes-config-health-unit"),
   expectedEnvKeyForModel: (provider: string, baseUrl?: string) => {
     if (provider === "anthropic") return "ANTHROPIC_API_KEY";
     if (provider === "custom" && String(baseUrl).includes("api.openai.com")) {
