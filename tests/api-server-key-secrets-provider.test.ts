@@ -36,12 +36,12 @@ beforeEach(() => {
   // CPU-saturated parallel run can't trip the provider's tight 3s production
   // timeout and resolve a spurious null (the spawn flake). Production never
   // sets this var — see resolveCommandTimeoutMs() in commandProvider.ts.
-  process.env.HERMES_SECRET_COMMAND_TIMEOUT_MS = "30000";
+  process.env.HERMES_CMD_HELPER_TIMEOUT_MS = "30000";
 });
 
 afterEach(() => {
   delete process.env.HERMES_HOME;
-  delete process.env.HERMES_SECRET_COMMAND_TIMEOUT_MS;
+  delete process.env.HERMES_CMD_HELPER_TIMEOUT_MS;
   if (ORIGINAL_API_SERVER_KEY === undefined) delete process.env.API_SERVER_KEY;
   else process.env.API_SERVER_KEY = ORIGINAL_API_SERVER_KEY;
   vi.resetModules();

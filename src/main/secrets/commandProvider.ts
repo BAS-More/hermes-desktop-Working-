@@ -68,7 +68,7 @@ export function resolveShell(): string {
  * doubles as the worst-case UI-freeze ceiling. Read at CALL time (not module
  * load) so tests can override it.
  *
- * Overridable via `HERMES_SECRET_COMMAND_TIMEOUT_MS` for TESTS ONLY: the spawn
+ * Overridable via `HERMES_CMD_HELPER_TIMEOUT_MS` for TESTS ONLY: the spawn
  * tests exercise a REAL `sh` process, and under a CPU-saturated parallel run
  * even a trivial `printf` can take >3s just to spawn, tripping the timeout and
  * yielding a spurious null (flaky failures unrelated to the code). Production
@@ -76,7 +76,7 @@ export function resolveShell(): string {
  * falls back to 3s.
  */
 export function resolveCommandTimeoutMs(): number {
-  const raw = process.env.HERMES_SECRET_COMMAND_TIMEOUT_MS;
+  const raw = process.env.HERMES_CMD_HELPER_TIMEOUT_MS;
   const parsed = raw ? Number.parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 3_000;
 }
