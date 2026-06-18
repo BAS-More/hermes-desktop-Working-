@@ -133,19 +133,25 @@ export default {
 
   // Community
   communityTitle: "Topluluk",
-  communityHint: "Sorular sormak, sorunları bildirmek ve diğer Hermes kullanıcılarıyla sohbet etmek için Discord kanalımıza katılın.",
+  communityHint:
+    "Sorular sormak, sorunları bildirmek ve diğer Hermes kullanıcılarıyla sohbet etmek için Discord kanalımıza katılın.",
   joinDiscord: "Discord Kanalına Katıl",
 
   // SSH & Server Config
   modeSsh: "SSH Tüneli",
-  modeSshHint: "SSH üzerinden uzak bir Hermes'e tünel oluşturun — açık bağlantı noktası veya API anahtarı gerekmez.",
-  sessionDisabledTitle: "Oturum geçmişi devre dışı — API_SERVER_KEY ayarlanmadı",
-  sessionDisabledDesc: "Bir API sunucu anahtarı olmadan gateway oturum devam isteklerini doğrulayamaz. Mesajlar yine de gönderilir, ancak konuşma geçmişi yeniden başlatmalar arasında korunmaz.",
+  modeSshHint:
+    "SSH üzerinden uzak bir Hermes'e tünel oluşturun — açık bağlantı noktası veya API anahtarı gerekmez.",
+  sessionDisabledTitle:
+    "Oturum geçmişi devre dışı — API_SERVER_KEY ayarlanmadı",
+  sessionDisabledDesc:
+    "Bir API sunucu anahtarı olmadan gateway oturum devam isteklerini doğrulayamaz. Mesajlar yine de gönderilir, ancak konuşma geçmişi yeniden başlatmalar arasında korunmaz.",
   generateKey: "Benim için bir anahtar oluştur ve kaydet",
   generating: "Üretiliyor…",
   remoteEnvTitle: "Uzak sunucuda API_SERVER_KEY değerini ayarlayın",
-  remoteEnvSshDesc: "SSH modu: uzak sunucudaki ~/.hermes/profiles/<profile>/.env dosyasına API_SERVER_KEY=<anahtarınız> ekleyin, ardından oradaki gateway'i yeniden başlatın.",
-  remoteEnvDesc: "Uzak mod: uzak Hermes sunucunuzdaki .env dosyasına API_SERVER_KEY=<anahtarınız> ekleyin, ardından gateway'i yeniden başlatın.",
+  remoteEnvSshDesc:
+    "SSH modu: uzak sunucudaki ~/.hermes/profiles/<profile>/.env dosyasına API_SERVER_KEY=<anahtarınız> ekleyin, ardından oradaki gateway'i yeniden başlatın.",
+  remoteEnvDesc:
+    "Uzak mod: uzak Hermes sunucunuzdaki .env dosyasına API_SERVER_KEY=<anahtarınız> ekleyin, ardından gateway'i yeniden başlatın.",
   sshHost: "SSH Sunucusu",
   sshPort: "SSH Portu",
   sshUsername: "Kullanıcı Adı",
@@ -153,21 +159,26 @@ export default {
   sshKeyPathOptional: "(isteğe bağlı, varsayılan ~/.ssh/id_rsa)",
   sshRemotePort: "Uzak Hermes Portu",
   sshRemotePortDefault: "(varsayılan 8642)",
-  sshHint: "Parola istemi olmadan ssh {{cmd}} komutunu çalıştırabildiğinizden emin olun. İlk bağlantı ana bilgisayar anahtarına güvenir ve bunu ~/.ssh/known_hosts dosyasına kaydeder; bu anahtar daha sonra değişirse SSH bağlantıyı reddedecektir.",
-  sshHintWelcome: "Sistem SSH'inizi kullanır. Parola istemi olmadan ssh {{cmd}} komutunu zaten çalıştırabildiğinizden emin olun.",
+  sshHint:
+    "Parola istemi olmadan ssh {{cmd}} komutunu çalıştırabildiğinizden emin olun. İlk bağlantı ana bilgisayar anahtarına güvenir ve bunu ~/.ssh/known_hosts dosyasına kaydeder; bu anahtar daha sonra değişirse SSH bağlantıyı reddedecektir.",
+  sshHintWelcome:
+    "Sistem SSH'inizi kullanır. Parola istemi olmadan ssh {{cmd}} komutunu zaten çalıştırabildiğinizden emin olun.",
   testingSsh: "SSH test ediliyor…",
   testSsh: "SSH Bağlantısını Test Et",
   connectSsh: "SSH ile Bağlan",
   sshTitle: "SSH ile Bağlan",
-  sshSubtitle: "SSH üzerinden uzak bir Hermes'e tünel oluşturun — açık bağlantı noktası veya API anahtarı gerekmez.",
+  sshSubtitle:
+    "SSH üzerinden uzak bir Hermes'e tünel oluşturun — açık bağlantı noktası veya API anahtarı gerekmez.",
   sshHostPlaceholder: "192.168.1.100 veya sunucum.local",
   sshUsernamePlaceholder: "hermes",
   sshErrorRequired: "Sunucu ve kullanıcı adı gereklidir.",
-  sshErrorConnection: "SSH üzerinden bağlanılamadı veya uzaktaki Hermes'e ulaşılamadı. Şunlardan emin olun:\n• SSH anahtarı doğru (veya varsayılan ~/.ssh/id_rsa çalışıyor)\n• Uzak sunucuda Hermes gateway'i çalışıyor\n• Uzak port doğru (varsayılan 8642)",
+  sshErrorConnection:
+    "SSH üzerinden bağlanılamadı veya uzaktaki Hermes'e ulaşılamadı. Şunlardan emin olun:\n• SSH anahtarı doğru (veya varsayılan ~/.ssh/id_rsa çalışıyor)\n• Uzak sunucuda Hermes gateway'i çalışıyor\n• Uzak port doğru (varsayılan 8642)",
   sshErrorFailed: "SSH bağlantı testi başarısız oldu: {{msg}}",
   sshErrorFailedSimple: "SSH bağlantı testi başarısız oldu.",
   remoteErrorUrl: "Lütfen bir URL girin.",
-  remoteErrorConnection: "Bu URL'deki Hermes'e ulaşılamadı. URL'yi ve API anahtarını kontrol edin.\n\nSunucu kimlik doğrulaması gerektirmeyen istekleri kabul ediyorsa (örn. localhost'a SSH tüneli üzerinden) anahtarı boş bırakın.",
+  remoteErrorConnection:
+    "Bu URL'deki Hermes'e ulaşılamadı. URL'yi ve API anahtarını kontrol edin.\n\nSunucu kimlik doğrulaması gerektirmeyen istekleri kabul ediyorsa (örn. localhost'a SSH tüneli üzerinden) anahtarı boş bırakın.",
   remoteErrorFailed: "Bağlantı testi başarısız oldu.",
   sshSuccess: "SSH tüneli bağlandı!",
   sshErrorRequiredSimple: "Sunucu ve kullanıcı adı gereklidir",

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Zap } from "lucide-react";
+import toast from "react-hot-toast";
+import { Zap, Globe } from "lucide-react";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { buildCouncilPrompt } from "./councilPrompt";
 import { ChatEmptyState } from "./ChatEmptyState";
@@ -11,18 +12,24 @@ import { WorktreePanel } from "./WorktreePanel";
 import { FactoryToggle } from "./FactoryToggle";
 import { FactoryPanel } from "./FactoryPanel";
 import { useFactoryStatus } from "../shared/useFactoryStatus";
+import { WebPreviewPanel } from "./WebPreviewPanel";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
-import { useChatActions } from "./hooks/useChatActions";
+import { useChatActions, parseBackgroundCommand } from "./hooks/useChatActions";
 import { useModelConfig } from "./hooks/useModelConfig";
 import { useFastMode } from "./hooks/useFastMode";
 import { useReasoningEffort } from "./hooks/useReasoningEffort";
 import { useLocalCommands } from "./hooks/useLocalCommands";
+import {
+  dashboardChatEnabledForConnection,
+  useDashboardChatTransport,
+} from "./hooks/useDashboardChatTransport";
 import { useI18n } from "../../components/useI18n";
 import { buildChatTranscript } from "./transcriptUtils";
 import { ConfigHealthBanner } from "../../components/ConfigHealthBanner";
+import FollowUsModal from "../../components/FollowUsModal";
 import type { Attachment } from "../../../../shared/attachments";
-import type { ChatMessage, UsageState } from "./types";
+import type { ActiveTurn, ChatMessage, UsageState } from "./types";
 import type { ContextUsage } from "./ContextGauge";
 import { contextWindowForModel } from "./contextWindows";
 import { QueuedMessages } from "./QueuedMessages";
@@ -107,6 +114,13 @@ function Chat({
   const [usage, setUsage] = useState<UsageState | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [remoteMode, setRemoteMode] = useState(false);
+  const [connectionMode, setConnectionMode] = useState<
+    "local" | "remote" | "ssh"
+  >("local");
+  const [chatTransportPreference, setChatTransportPreference] = useState<
+    "auto" | "dashboard" | "legacy"
+  >("auto");
+  const [connectionModeLoaded, setConnectionModeLoaded] = useState(false);
   // Working folder bound to this conversation (issue #27). Per-conversation,
   // held in memory; reset on session switch / new chat below.
   const [contextFolder, setContextFolder] = useState<string | null>(null);
@@ -117,19 +131,70 @@ function Chat({
   // orchestrator closed-loop ("factory mode"). Hidden in remote mode.
   const [factoryVisible, setFactoryVisible] = useState<boolean>(false);
   const factory = useFactoryStatus(factoryVisible && !remoteMode);
+  const [webPreviewVisible, setWebPreviewVisible] = useState<boolean>(false);
+  const [webPreviewUrl, setWebPreviewUrl] =
+    useState<string>("https://google.com");
+  // Explicit session-scoped model override — set only when the user picks
+  // from the chat-screen picker (persist:false). Undefined until then so the
+  // TUI gateway bypass in sendMessageViaBestApi is not triggered for normal
+  // chats where the user never changed the model (issue #688).
+  const [sessionModelOverride, setSessionModelOverride] = useState<
+    string | undefined
+  >(undefined);
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const queueRef = useRef<QueuedMessage[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+  const activeTurnRef = useRef<ActiveTurn | null>(null);
+  const dashboardChatEnabled = dashboardChatEnabledForConnection(
+    import.meta.env.VITE_HERMES_DESKTOP_DASHBOARD_CHAT,
+    connectionModeLoaded,
+    connectionMode,
+    chatTransportPreference,
+  );
 
   useEffect(() => {
     let cancelled = false;
-    (async (): Promise<void> => {
-      const flag = await window.hermesAPI.isRemoteMode();
-      if (!cancelled) setRemoteMode(flag);
-    })();
+    const loadConnectionConfig = async (): Promise<void> => {
+      try {
+        const conn = await window.hermesAPI.getConnectionConfig();
+        if (!cancelled) {
+          setConnectionMode(conn.mode);
+          setRemoteMode(conn.mode !== "local");
+          setChatTransportPreference(
+            conn.mode === "local"
+              ? "auto"
+              : conn.mode === "ssh"
+                ? (conn.sshChatTransport ?? "auto")
+                : (conn.remoteChatTransport ?? "auto"),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setConnectionMode("ssh");
+          setRemoteMode(true);
+          setChatTransportPreference("legacy");
+        }
+      } finally {
+        if (!cancelled) setConnectionModeLoaded(true);
+      }
+    };
+    void loadConnectionConfig();
+    const unsubscribe = window.hermesAPI.onConnectionConfigChanged((conn) => {
+      setConnectionModeLoaded(true);
+      setConnectionMode(conn.mode);
+      setRemoteMode(conn.mode !== "local");
+      setChatTransportPreference(
+        conn.mode === "local"
+          ? "auto"
+          : conn.mode === "ssh"
+            ? (conn.sshChatTransport ?? "auto")
+            : (conn.remoteChatTransport ?? "auto"),
+      );
+    });
     return (): void => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -210,13 +275,17 @@ function Chat({
     modelConfig.currentBaseUrl,
   ]);
 
+  const visibleSessionScopeId = messages.length === 0 ? null : hermesSessionId;
+
   useChatIPC({
     runId,
+    sessionScopeId: visibleSessionScopeId,
     setMessages,
     setHermesSessionId,
     setToolProgress,
     setIsLoading,
     setUsage,
+    activeTurnRef,
   });
 
   // No parent-driven reset effects: each run is its own <Chat key={runId}>
@@ -237,6 +306,23 @@ function Chat({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, onNewChat]);
+
+  // Listen for in-app link clicks to load in the split-screen Web Preview panel
+  useEffect(() => {
+    if (!active) return;
+    const handleNavigate = (e: Event): void => {
+      const customEvent = e as CustomEvent<string>;
+      const url = customEvent.detail;
+      if (url) {
+        setWebPreviewUrl(url);
+        setWebPreviewVisible(true);
+      }
+    };
+    document.addEventListener("web-preview:navigate", handleNavigate);
+    return () => {
+      document.removeEventListener("web-preview:navigate", handleNavigate);
+    };
+  }, [active]);
 
   // "Copy entire chat" context-menu items (issue #298) — serialise the whole
   // conversation in the requested format and copy it. A ref keeps the latest
@@ -324,6 +410,7 @@ function Chat({
     setMessages([]);
     setHermesSessionId(null);
     setContextFolder(null);
+    activeTurnRef.current = null;
     setUsage(null);
     setToolProgress(null);
     queueRef.current = [];
@@ -339,6 +426,44 @@ function Chat({
     addAgentMessage,
   });
 
+  // Fired once per connection when the dashboard WebSocket transport can't
+  // connect (e.g. SSH tunnel → `hermes gateway`, which has no `/api/ws`, issue
+  // #667) and we fall back to legacy chat. A fixed toast id dedupes.
+  const handleDashboardUnavailable = useCallback(() => {
+    toast(t("chat.dashboardUnavailableFallback"), {
+      id: "dashboard-unavailable-fallback",
+      icon: "ℹ️",
+      duration: 8000,
+    });
+  }, [t]);
+
+  const dashboardTransport = useDashboardChatTransport({
+    activeTurnRef,
+    contextFolder,
+    connectionMode,
+    enabled: dashboardChatEnabled,
+    fallbackOnUnavailable: chatTransportPreference === "auto",
+    hermesSessionId,
+    messages,
+    model: modelConfig.currentModel,
+    modelBaseUrl: modelConfig.currentBaseUrl,
+    profile,
+    provider: modelConfig.currentProvider,
+    setHermesSessionId,
+    setIsLoading,
+    setMessages,
+    setToolProgress,
+    setUsage,
+    onDashboardUnavailable: handleDashboardUnavailable,
+  });
+
+  // Defer a message onto the busy queue (used when a slash command resolves to
+  // an agent prompt while a turn is already in flight).
+  const enqueueMessage = useCallback((text: string) => {
+    queueRef.current.push({ text, attachments: [] });
+    setQueuedMessages([...queueRef.current]);
+  }, []);
+
   const actions = useChatActions({
     runId,
     profile,
@@ -350,14 +475,32 @@ function Chat({
     onSessionStarted,
     chatInputRef,
     localCommands,
+    activeTurnRef,
     contextFolder,
+    sessionModel: sessionModelOverride,
+    sendViaDashboard: dashboardTransport.enabled
+      ? dashboardTransport.sendMessage
+      : undefined,
+    execSlashViaDashboard: dashboardTransport.enabled
+      ? dashboardTransport.execSlash
+      : undefined,
+    runBackgroundViaDashboard: dashboardTransport.enabled
+      ? dashboardTransport.runBackground
+      : undefined,
+    addAgentMessage,
+    enqueueMessage,
+    abortDashboard: dashboardTransport.enabled
+      ? dashboardTransport.abort
+      : undefined,
   });
 
   // Stable ref to handleSend so the drain effect doesn't re-trigger on
   // identity changes (regression #5 from PR #315).
   const handleSendRef = useRef(actions.handleSend);
+  const handleBackgroundRef = useRef(actions.handleBackground);
   useEffect(() => {
     handleSendRef.current = actions.handleSend;
+    handleBackgroundRef.current = actions.handleBackground;
   });
 
   // Drain queued messages one at a time when the agent finishes.
@@ -381,6 +524,29 @@ function Chat({
 
   const handleSubmitOrQueue = useCallback(
     (text: string, attachments: Attachment[]) => {
+      // Side questions (`/btw`) run on a concurrent background agent, so they
+      // must never queue — fire them immediately even while the main turn is in
+      // flight. This is the whole point of "ask without affecting context".
+      const bgQuestion = parseBackgroundCommand(text);
+      if (bgQuestion !== null) {
+        if (bgQuestion)
+          void handleBackgroundRef.current(bgQuestion, attachments);
+        return;
+      }
+      // Other slash commands (`/status`, `/compact`, …) run on the gateway's
+      // slash worker or are renderer-local — all concurrent with any in-flight
+      // turn — so dispatch them immediately instead of queueing. handleSend's
+      // own routing decides what each one does (and defers the rare command
+      // that resolves to an agent prompt while busy). Limited to local commands
+      // and the dashboard transport (which has the worker); the legacy
+      // transport has no concurrent path, so its slash commands still queue.
+      if (
+        text.startsWith("/") &&
+        (localCommands.isLocal(text) || dashboardChatEnabled)
+      ) {
+        void handleSendRef.current(text, attachments, true);
+        return;
+      }
       if (isLoading) {
         queueRef.current.push({ text, attachments });
         setQueuedMessages([...queueRef.current]);
@@ -388,7 +554,7 @@ function Chat({
       }
       void handleSendRef.current(text, attachments);
     },
-    [isLoading],
+    [isLoading, localCommands, dashboardChatEnabled],
   );
 
   const handleSuggestion = useCallback((text: string) => {
@@ -487,6 +653,95 @@ function Chat({
       }
     : null;
 
+  const prettyPrintHTML = (html: string): string => {
+    const formatNode = (node: Node, level: number = 0): string => {
+      const indent = "  ".repeat(level);
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        return text ? `${indent}${text}\n` : "";
+      }
+      if (node.nodeType === Node.COMMENT_NODE) {
+        return `${indent}<!--${node.textContent}-->\n`;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        const tagName = el.tagName.toLowerCase();
+        let attrs = "";
+        for (let i = 0; i < el.attributes.length; i++) {
+          const attr = el.attributes[i];
+          attrs += ` ${attr.name}="${attr.value}"`;
+        }
+        const isVoid = [
+          "area",
+          "base",
+          "br",
+          "col",
+          "embed",
+          "hr",
+          "img",
+          "input",
+          "link",
+          "meta",
+          "param",
+          "source",
+          "track",
+          "wbr",
+        ].includes(tagName);
+        if (isVoid) {
+          return `${indent}<${tagName}${attrs}>\n`;
+        }
+        if (
+          el.childNodes.length === 1 &&
+          el.firstChild?.nodeType === Node.TEXT_NODE
+        ) {
+          const text = el.firstChild.textContent?.trim();
+          return text
+            ? `${indent}<${tagName}${attrs}>${text}</${tagName}>\n`
+            : `${indent}<${tagName}${attrs}></${tagName}>\n`;
+        }
+        if (el.childNodes.length === 0) {
+          return `${indent}<${tagName}${attrs}></${tagName}>\n`;
+        }
+        let childrenHtml = "";
+        for (let i = 0; i < el.childNodes.length; i++) {
+          childrenHtml += formatNode(el.childNodes[i], level + 1);
+        }
+        return `${indent}<${tagName}${attrs}>\n${childrenHtml}${indent}</${tagName}>\n`;
+      }
+      return "";
+    };
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const body = doc.body;
+      if (body.childNodes.length > 0) {
+        let result = "";
+        for (let i = 0; i < body.childNodes.length; i++) {
+          result += formatNode(body.childNodes[i], 0);
+        }
+        return result.trim();
+      }
+    } catch (e) {
+      console.error("Failed to pretty print HTML", e);
+    }
+    return html;
+  };
+
+  const handleInspectElement = useCallback(
+    (payload: {
+      tagName: string;
+      id: string;
+      className: string;
+      outerHTML: string;
+    }) => {
+      const formattedHtml = prettyPrintHTML(payload.outerHTML);
+      const formatted = `Here is the HTML for the \`<${payload.tagName}>\` component to debug:\n\`\`\`html\n${formattedHtml}\n\`\`\``;
+      chatInputRef.current?.appendText(formatted);
+    },
+    [],
+  );
+
   return (
     <div
       className="chat-container"
@@ -530,6 +785,14 @@ function Chat({
             onNavigateToTask={onNavigateToTask}
           />
         )}
+
+        {webPreviewVisible && (
+          <WebPreviewPanel
+            initialUrl={webPreviewUrl}
+            onClose={() => setWebPreviewVisible(false)}
+            onInspectElement={handleInspectElement}
+          />
+        )}
       </div>
 
       <div className="chat-input-area">
@@ -559,7 +822,12 @@ function Chat({
                 modelGroups={modelConfig.modelGroups}
                 displayModel={modelConfig.displayModel}
                 onOpen={modelConfig.reload}
-                onSelectModel={modelConfig.selectModel}
+                onSelectModel={(provider, model, baseUrl) => {
+                  void modelConfig.selectModel(provider, model, baseUrl, {
+                    persist: false,
+                  });
+                  setSessionModelOverride(model || undefined);
+                }}
               />
               <ReasoningEffortPicker
                 value={reasoningEffort}
@@ -604,6 +872,31 @@ function Chat({
                   });
                 }}
               />
+              <button
+                type="button"
+                className={`btn-ghost chat-tool-btn ${webPreviewVisible ? "chat-tool-btn-active" : ""}`}
+                onClick={() => setWebPreviewVisible((v) => !v)}
+                title={
+                  webPreviewVisible ? "Hide web preview" : "Show web preview"
+                }
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 28,
+                  height: 28,
+                  padding: 0,
+                  borderRadius: 6,
+                  color: webPreviewVisible
+                    ? "var(--accent-text)"
+                    : "var(--text-secondary)",
+                  background: webPreviewVisible
+                    ? "color-mix(in srgb, var(--accent-text) 10%, transparent)"
+                    : "transparent",
+                }}
+              >
+                <Globe size={14} />
+              </button>
             </>
           }
         />
@@ -615,6 +908,8 @@ function Chat({
           </div>
         </div>
       )}
+      {/* Show follow-us modal only after setup is complete */}
+      {active && connectionModeLoaded && readiness.ok && <FollowUsModal />}
     </div>
   );
 }

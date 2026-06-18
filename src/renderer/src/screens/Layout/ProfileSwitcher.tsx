@@ -164,6 +164,11 @@ export default function ProfileSwitcher({
                                   {t("agents.defaultTag")}
                                 </span>
                               )}
+                              <span
+                                className={`profile-menu-gateway ${
+                                  p.gatewayRunning ? "active" : ""
+                                }`}
+                              />
                             </span>
                             <span className="profile-menu-meta">
                               {[

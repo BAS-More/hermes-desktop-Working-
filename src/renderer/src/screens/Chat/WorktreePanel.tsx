@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, memo } from "react";
-import { Folder, ChevronRight, ChevronDown, SquareTerminal } from "lucide-react";
+import {
+  Folder,
+  ChevronRight,
+  ChevronDown,
+  SquareTerminal,
+} from "lucide-react";
 import { getIconForFile, getSVGStringFromFileType } from "@wesbos/code-icons";
 import { FileViewer } from "./FileViewer";
 import { useI18n } from "../../components/useI18n";
@@ -211,7 +216,9 @@ export const WorktreePanel = memo(function WorktreePanel({
       )}
       <div className="worktree-content">
         {isLoading ? (
-          <div className="worktree-loading">{t("chat.worktree.loading")}...</div>
+          <div className="worktree-loading">
+            {t("chat.worktree.loading")}...
+          </div>
         ) : error ? (
           <div className="worktree-error">{error}</div>
         ) : entries === null || entries.length === 0 ? (

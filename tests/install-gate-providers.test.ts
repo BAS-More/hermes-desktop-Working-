@@ -59,9 +59,9 @@ describe("expectedEnvKeyForModel — URL fallback for custom/auto providers", ()
     expect(
       expectedEnvKeyForModel("custom", "https://openrouter.ai/api/v1"),
     ).toBe("OPENROUTER_API_KEY");
-    expect(
-      expectedEnvKeyForModel("custom", "https://ollama.com/v1"),
-    ).toBe("OLLAMA_API_KEY");
+    expect(expectedEnvKeyForModel("custom", "https://ollama.com/v1")).toBe(
+      "OLLAMA_API_KEY",
+    );
     expect(expectedEnvKeyForModel("custom", "https://api.aimlapi.com/v1")).toBe(
       "AIMLAPI_API_KEY",
     );

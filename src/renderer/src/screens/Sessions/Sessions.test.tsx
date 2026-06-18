@@ -55,11 +55,13 @@ function agg(partial: Partial<AggSession> & { id: string }): AggSession {
     ...partial,
   };
 }
-
 function installHermesAPI(
   initialSessions: AggSession[] = [],
-): Record<string, ReturnType<typeof vi.fn>> {
-  const api = {
+): Record<string, ReturnType<typeof vi.fn>> & {
+  emitConnectionConfigChanged: () => void;
+} {
+  let connectionConfigChanged: (() => void) | null = null;
+  const api: Record<string, ReturnType<typeof vi.fn>> = {
     listAllSessions: vi.fn().mockResolvedValue(initialSessions),
     syncAllSessionCaches: vi.fn().mockResolvedValue(initialSessions),
     searchAllSessions: vi.fn().mockResolvedValue([]),
@@ -74,12 +76,27 @@ function installHermesAPI(
     moveSessionToGroup: vi.fn().mockResolvedValue(undefined),
     renameSession: vi.fn().mockResolvedValue(undefined),
     createSessionGroup: vi.fn().mockResolvedValue(null),
+    onConnectionConfigChanged: vi.fn((callback: () => void) => {
+      connectionConfigChanged = callback;
+      return () => {
+        if (connectionConfigChanged === callback) {
+          connectionConfigChanged = null;
+        }
+      };
+    }),
   };
   Object.defineProperty(window, "hermesAPI", {
     configurable: true,
     value: api,
   });
-  return api;
+  return {
+    ...api,
+    emitConnectionConfigChanged: () => {
+      connectionConfigChanged?.();
+    },
+  } as Record<string, ReturnType<typeof vi.fn>> & {
+    emitConnectionConfigChanged: () => void;
+  };
 }
 
 function searchResult(
@@ -166,6 +183,68 @@ describe("Sessions tab live refresh (#322)", () => {
       window.dispatchEvent(new Event("focus"));
     });
     expect(api.syncAllSessionCaches.mock.calls.length).toBe(afterMount + 1);
+  });
+
+  it("keeps visible sessions when a quiet refresh transiently returns empty", async () => {
+    const api = installHermesAPI([
+      agg({
+        id: "ssh-session",
+        title: "SSH session",
+        source: "api_server",
+        messageCount: 3,
+        model: "deepseek-v4-pro",
+      }),
+    ]);
+
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+    expect(screen.getByText("SSH session")).toBeTruthy();
+
+    api.syncAllSessionCaches.mockResolvedValue([]);
+
+    await act(async () => {
+      vi.advanceTimersByTime(SESSIONS_REFRESH_MS);
+    });
+
+    expect(screen.getByText("SSH session")).toBeTruthy();
+    expect(screen.queryByText("sessions.empty")).toBeNull();
+  });
+
+  it("clears stale rows and reloads when the connection source changes", async () => {
+    vi.useRealTimers();
+    const api = installHermesAPI([
+      agg({
+        id: "local-session",
+        title: "Local session",
+        source: "desktop",
+        messageCount: 1,
+        model: "gpt-5.5",
+      }),
+    ]);
+    render(<Sessions {...baseProps} visible={true} />);
+    await act(async () => {});
+    expect(screen.getByText("Local session")).toBeTruthy();
+
+    const remote = [
+      agg({
+        id: "remote-session",
+        title: "Remote session",
+        source: "tui",
+        messageCount: 2,
+        model: "deepseek-v4-pro",
+      }),
+    ];
+    api.listAllSessions.mockResolvedValue(remote);
+    api.syncAllSessionCaches.mockResolvedValue(remote);
+
+    await act(async () => {
+      api.emitConnectionConfigChanged();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Remote session")).toBeTruthy();
+    });
+    expect(screen.queryByText("Local session")).toBeNull();
   });
 
   it("renders sessions recovered by sync when the fast cache starts empty", async () => {

@@ -36,7 +36,7 @@ export const ReasoningRow = memo(function ReasoningRow({
         showAvatar ? "" : " chat-message--grouped"
       }`}
     >
-      {showAvatar ? <HermesAvatar /> : <AvatarSpacer />}
+      {showAvatar ? <HermesAvatar active={active} /> : <AvatarSpacer />}
       <div
         className={`chat-reasoning-group${
           active ? " chat-reasoning-group--active" : ""
@@ -120,6 +120,42 @@ export function toolActivityGroupTitle(items: ToolItem[]): string {
 function singleToolName(items: ToolItem[]): string | null {
   if (items.filter(isToolCall).length > 1) return null;
   return items[items.length - 1]?.name ?? null;
+}
+
+export function orderToolActivityItems(items: ToolItem[]): ToolItem[] {
+  const callIds = new Set(
+    items
+      .filter(isToolCall)
+      .map((item) => item.callId)
+      .filter(Boolean),
+  );
+  const resultsByCallId = new Map<string, ToolResultMessage[]>();
+  for (const item of items) {
+    if (isToolCall(item) || !item.callId) continue;
+    const bucket = resultsByCallId.get(item.callId) ?? [];
+    bucket.push(item);
+    resultsByCallId.set(item.callId, bucket);
+  }
+
+  const emittedResults = new Set<ToolResultMessage>();
+  const ordered: ToolItem[] = [];
+  for (const item of items) {
+    if (isToolCall(item)) {
+      ordered.push(item);
+      for (const result of resultsByCallId.get(item.callId) ?? []) {
+        ordered.push(result);
+        emittedResults.add(result);
+      }
+      continue;
+    }
+
+    if (emittedResults.has(item)) continue;
+    if (item.callId && callIds.has(item.callId)) continue;
+    ordered.push(item);
+    emittedResults.add(item);
+  }
+
+  return ordered;
 }
 
 function resultMeta(msg: ToolResultMessage): string {
@@ -213,6 +249,7 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
   const detail = itemDetail(last);
   const title = toolActivityGroupTitle(items);
   const soloTool = singleToolName(items);
+  const orderedItems = orderToolActivityItems(items);
 
   return (
     <div
@@ -220,7 +257,7 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
         showAvatar ? "" : " chat-message--grouped"
       }`}
     >
-      {showAvatar ? <HermesAvatar /> : <AvatarSpacer />}
+      {showAvatar ? <HermesAvatar active={active} /> : <AvatarSpacer />}
       <div
         className={`chat-tool-group${active ? " chat-tool-group--active" : ""}`}
       >
@@ -266,8 +303,8 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
         >
           <div className="chat-tool-collapse-inner">
             <div className="chat-tool-group-items">
-              {items.map((it) => (
-                <ToolActivityItem key={it.id} msg={it} />
+              {orderedItems.map((it, index) => (
+                <ToolActivityItem key={`${it.id}-${index}`} msg={it} />
               ))}
             </div>
           </div>

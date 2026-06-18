@@ -621,12 +621,8 @@ function Layout({
       </aside>
 
       <main className="content">
-        {verifyWarning && onReinstall && onDismissVerifyWarning && (
-          <VerifyWarningBanner
-            onReinstall={onReinstall}
-            onDismiss={onDismissVerifyWarning}
-          />
-        )}
+        {/* Doubles as the window drag strip — keep it first so it owns the top
+            band; the warning banner (if any) sits just below it. */}
         <ActiveSessionsBar
           runs={runs}
           activeRunId={activeRunId}
@@ -634,6 +630,12 @@ function Layout({
           onClose={handleCloseRun}
           getAppearance={getAppearance}
         />
+        {verifyWarning && onReinstall && onDismissVerifyWarning && (
+          <VerifyWarningBanner
+            onReinstall={onReinstall}
+            onDismiss={onDismissVerifyWarning}
+          />
+        )}
         <div style={paneStyle("chat")}>
           {runs.map((run) => (
             <div
@@ -667,16 +669,12 @@ function Layout({
 
         {visitedViews.has("sessions") && (
           <div style={paneStyle("sessions")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Sessions" />
-            ) : (
-              <Sessions
-                onResumeSession={handleResumeSession}
-                onNewChat={handleNewChat}
-                currentSessionId={currentSessionId}
-                visible={view === "sessions"}
-              />
-            )}
+            <Sessions
+              onResumeSession={handleResumeSession}
+              onNewChat={handleNewChat}
+              currentSessionId={currentSessionId}
+              visible={view === "sessions"}
+            />
           </div>
         )}
 

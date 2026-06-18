@@ -44,16 +44,27 @@ function DiffView({ code }: { code: string }): React.JSX.Element {
   );
 }
 
+// Source-position ids of code blocks the user has expanded. Kept at module
+// scope so the choice survives the remounts react-markdown causes while a
+// message is still streaming (index-based keys shift as the AST grows, which
+// would otherwise reset a per-component useState back to collapsed).
+const expandedCodeBlocks = new Set<string>();
+
 // Code block with syntax highlighting and copy button (lazy-loaded highlighter)
 function CodeBlock({
   className,
   children,
+  blockId,
 }: {
   className?: string;
   children?: React.ReactNode;
+  blockId?: string;
 }): React.JSX.Element {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() =>
+    blockId ? !expandedCodeBlocks.has(blockId) : true,
+  );
   const [highlighterReady, setHighlighterReady] = useState(
     () => _highlighterMod !== null && _oneDark !== null,
   );
@@ -61,6 +72,9 @@ function CodeBlock({
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
   const isDiff = language === "diff";
+
+  const linesCount = code.split("\n").length;
+  const isLong = linesCount > 15 || code.length > 800;
 
   // Trigger lazy load when code block mounts
   useEffect(() => {
@@ -91,6 +105,27 @@ function CodeBlock({
     </pre>
   );
 
+  const codeContent = isDiff ? (
+    <DiffView code={code} />
+  ) : highlighterReady && _highlighterMod && _oneDark ? (
+    <_highlighterMod.Prism
+      style={_oneDark}
+      language={language || "text"}
+      PreTag="div"
+      customStyle={{
+        margin: 0,
+        borderRadius: 0,
+        fontSize: "13px",
+        padding: "12px",
+        background: "transparent",
+      }}
+    >
+      {code}
+    </_highlighterMod.Prism>
+  ) : (
+    fallbackPre
+  );
+
   return (
     <div className="chat-code-block">
       <div className="chat-code-header">
@@ -101,25 +136,28 @@ function CodeBlock({
           {copied ? t("common.copied") : <Copy size={13} />}
         </button>
       </div>
-      {isDiff ? (
-        <DiffView code={code} />
-      ) : highlighterReady && _highlighterMod && _oneDark ? (
-        <_highlighterMod.Prism
-          style={_oneDark}
-          language={language || "text"}
-          PreTag="div"
-          customStyle={{
-            margin: 0,
-            borderRadius: 0,
-            fontSize: "13px",
-            padding: "12px",
-            background: "transparent",
-          }}
+      <div className={isLong && isCollapsed ? "chat-code-collapsed" : ""}>
+        {codeContent}
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          className="chat-code-expand-btn"
+          onClick={() =>
+            setIsCollapsed((prev) => {
+              const next = !prev;
+              if (blockId) {
+                if (next) expandedCodeBlocks.delete(blockId);
+                else expandedCodeBlocks.add(blockId);
+              }
+              return next;
+            })
+          }
         >
-          {code}
-        </_highlighterMod.Prism>
-      ) : (
-        fallbackPre
+          {isCollapsed
+            ? t("common.showMore") || "Show more"
+            : t("common.showLess") || "Show less"}
+        </button>
       )}
     </div>
   );
@@ -146,6 +184,13 @@ const AgentMarkdown = memo(function AgentMarkdown({
                 if (!["http:", "https:", "mailto:"].includes(url.protocol)) {
                   return;
                 }
+                if (url.protocol === "http:" || url.protocol === "https:") {
+                  const event = new CustomEvent("web-preview:navigate", {
+                    detail: href,
+                  });
+                  document.dispatchEvent(event);
+                  return;
+                }
               } catch {
                 return;
               }
@@ -167,7 +212,7 @@ const AgentMarkdown = memo(function AgentMarkdown({
             <DownloadChip token={token} />
           );
         },
-        code: ({ className, children, ...props }) => {
+        code: ({ className, children, node, ...props }) => {
           const isInline =
             !className &&
             typeof children === "string" &&
@@ -179,7 +224,19 @@ const AgentMarkdown = memo(function AgentMarkdown({
               </code>
             );
           }
-          return <CodeBlock className={className}>{children}</CodeBlock>;
+          // Source offset of the opening fence is stable as the block streams,
+          // so it survives react-markdown's streaming remounts (unlike index
+          // keys) and uniquely identifies this block within the message.
+          const start = node?.position?.start;
+          const blockId =
+            start != null
+              ? `${start.offset ?? start.line}:${className ?? ""}`
+              : undefined;
+          return (
+            <CodeBlock className={className} blockId={blockId}>
+              {children}
+            </CodeBlock>
+          );
         },
       }}
     >

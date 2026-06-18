@@ -111,7 +111,7 @@ export function runConfigHealthCheck(profile?: string): ConfigHealthReport {
     } catch (err) {
       // Swallow — a broken check never breaks the audit. Log to console
       // so a developer can find it; users see only the empty result.
-      // eslint-disable-next-line no-console
+
       console.warn("[config-health] check threw:", err);
     }
   }
@@ -393,7 +393,7 @@ function checkNonAsciiCredentials(profile?: string): ConfigHealthIssue[] {
       continue;
     }
     if (!value) continue;
-    // eslint-disable-next-line no-control-regex
+
     if (/[^\x20-\x7e]/.test(value)) {
       offenders.push(key);
     }
@@ -495,7 +495,7 @@ function fixNonAsciiCredential(
   const cleaned: string[] = [];
   for (const key of keys) {
     const value = env[key] ?? "";
-    // eslint-disable-next-line no-control-regex
+
     const stripped = value.replace(/[^\x20-\x7e]/g, "");
     if (stripped !== value && stripped) {
       setEnvValue(key, stripped, profile);

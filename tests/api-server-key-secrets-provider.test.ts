@@ -18,6 +18,8 @@ import { tmpdir } from "os";
  */
 
 const TEST_DIR = join(tmpdir(), `hermes-test-secrets-key-${Date.now()}`);
+const itPosix = process.platform === "win32" ? it.skip : it;
+const ORIGINAL_API_SERVER_KEY = process.env.API_SERVER_KEY;
 
 async function freshConfig(
   home: string,
@@ -29,35 +31,40 @@ async function freshConfig(
 
 beforeEach(() => {
   mkdirSync(TEST_DIR, { recursive: true });
+  delete process.env.API_SERVER_KEY;
 });
 
 afterEach(() => {
   delete process.env.HERMES_HOME;
-  delete process.env.API_SERVER_KEY;
+  if (ORIGINAL_API_SERVER_KEY === undefined) delete process.env.API_SERVER_KEY;
+  else process.env.API_SERVER_KEY = ORIGINAL_API_SERVER_KEY;
   vi.resetModules();
   rmSync(TEST_DIR, { recursive: true, force: true });
 });
 
 describe("getApiServerKey secrets-provider overlay", () => {
-  it("resolves a vault-stored key via the command provider when .env is empty", async () => {
-    writeFileSync(
-      join(TEST_DIR, "config.yaml"),
-      [
-        "secrets:",
-        "  provider: command",
-        "  command: echo API_SERVER_KEY=from-vault",
-        "",
-      ].join("\n"),
-    );
-    // No .env file at all — previously this returned "" and consumers 401'd.
-    const { getApiServerKey } = await freshConfig(TEST_DIR);
+  itPosix(
+    "resolves a vault-stored key via the command provider when .env is empty",
+    async () => {
+      writeFileSync(
+        join(TEST_DIR, "config.yaml"),
+        [
+          "secrets:",
+          "  provider: command",
+          "  command: echo API_SERVER_KEY=from-vault",
+          "",
+        ].join("\n"),
+      );
+      // No .env file at all — previously this returned "" and consumers 401'd.
+      const { getApiServerKey } = await freshConfig(TEST_DIR);
 
-    expect(getApiServerKey()).toBe("from-vault");
+      expect(getApiServerKey()).toBe("from-vault");
 
-    // The vault value must NOT be migrated (written) to .env: it resolves as
-    // the canonical envProfile arm, and secrets never land on disk.
-    expect(existsSync(join(TEST_DIR, ".env"))).toBe(false);
-  });
+      // The vault value must NOT be migrated (written) to .env: it resolves as
+      // the canonical envProfile arm, and secrets never land on disk.
+      expect(existsSync(join(TEST_DIR, ".env"))).toBe(false);
+    },
+  );
 
   it("env-provider no-regression: .env value wins and nothing changes", async () => {
     // No secrets.* config → default env provider (its list() IS the .env map).
@@ -68,23 +75,26 @@ describe("getApiServerKey secrets-provider overlay", () => {
     expect(getApiServerKey()).toBe("from-dotenv");
   });
 
-  it(".env wins over the command provider when both have the key", async () => {
-    writeFileSync(
-      join(TEST_DIR, "config.yaml"),
-      [
-        "secrets:",
-        "  provider: command",
-        "  command: echo API_SERVER_KEY=from-vault",
-        "",
-      ].join("\n"),
-    );
-    writeFileSync(join(TEST_DIR, ".env"), "API_SERVER_KEY=from-dotenv\n");
-    const { getApiServerKey } = await freshConfig(TEST_DIR);
+  itPosix(
+    ".env wins over the command provider when both have the key",
+    async () => {
+      writeFileSync(
+        join(TEST_DIR, "config.yaml"),
+        [
+          "secrets:",
+          "  provider: command",
+          "  command: echo API_SERVER_KEY=from-vault",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(join(TEST_DIR, ".env"), "API_SERVER_KEY=from-dotenv\n");
+      const { getApiServerKey } = await freshConfig(TEST_DIR);
 
-    expect(getApiServerKey()).toBe("from-dotenv");
-  });
+      expect(getApiServerKey()).toBe("from-dotenv");
+    },
+  );
 
-  it("process.env wins over the command provider", async () => {
+  itPosix("process.env wins over the command provider", async () => {
     writeFileSync(
       join(TEST_DIR, "config.yaml"),
       [
