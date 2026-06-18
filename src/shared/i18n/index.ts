@@ -1,4 +1,4 @@
-import i18next, { type Resource } from "i18next";
+import i18next, { type Resource, type i18n } from "i18next";
 import {
   APP_LOCALES,
   DEFAULT_ACTIVE_LOCALE,
@@ -489,7 +489,7 @@ function readKey(node: unknown, path: string): string | undefined {
 
 let locale: AppLocale = DEFAULT_ACTIVE_LOCALE;
 
-export const sharedI18n = i18next.createInstance();
+export const sharedI18n: i18n = i18next.createInstance();
 
 void sharedI18n.init({
   lng: locale,
