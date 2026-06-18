@@ -2,8 +2,50 @@ import {
   execFileSync,
   type ExecFileSyncOptionsWithStringEncoding,
 } from "child_process";
+import { existsSync } from "fs";
 import type { SecretsProvider } from "./provider";
 import { getConfigValue } from "../config";
+
+/**
+ * Resolve a POSIX `sh` to run the helper command with.
+ *
+ * The helper command is POSIX shell syntax (the docs/examples use `printf`,
+ * `keepassxc-cli`, `cat tmpfs`, dotenv dumps), so we always want a POSIX shell —
+ * NOT cmd.exe/PowerShell. Historically this was the hardcoded absolute path
+ * `/bin/sh`, which is correct on Linux/macOS but FAILS on Windows: Node's
+ * `execFileSync` resolves `/bin/sh` against the real Win32 filesystem, where it
+ * does not exist (the MSYS/Git-Bash `/bin/sh` is a shell mount illusion, not a
+ * Win32 path), so every spawn returned ENOENT and every key degraded to null.
+ *
+ * Resolution order:
+ *   1. A bare `"sh"` — let the OS resolve it on PATH. On Linux/macOS this is
+ *      `/bin/sh`; on Windows with Git Bash / WSL / Cygwin on PATH this finds a
+ *      real POSIX shell, making the provider work cross-platform.
+ *   2. Common absolute fallbacks for environments where `sh` isn't on PATH but a
+ *      known shell exists (Git for Windows default install).
+ *
+ * Returns `"sh"` as the last resort so the spawn still attempts PATH resolution;
+ * if no shell exists the spawn fails and the provider degrades to null exactly
+ * as before (logged), never throwing.
+ */
+export function resolveShell(): string {
+  // POSIX: bare "sh" resolves to /bin/sh via PATH. Cheap and correct.
+  if (process.platform !== "win32") return "sh";
+
+  // Windows: prefer well-known Git-for-Windows / system shells by absolute
+  // path (PATH may not include them even when installed), else fall back to
+  // bare "sh" for WSL/Cygwin setups that DO put it on PATH.
+  const candidates = [
+    process.env.SHELL,
+    "C:\\Program Files\\Git\\usr\\bin\\sh.exe",
+    "C:\\Program Files\\Git\\bin\\sh.exe",
+    "C:\\Program Files (x86)\\Git\\usr\\bin\\sh.exe",
+  ].filter((p): p is string => typeof p === "string" && p.length > 0);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return "sh";
+}
 
 /**
  * Hard cap so a hung helper can never wedge a turn. Kept deliberately TIGHT (3s)
@@ -185,7 +227,7 @@ export class CommandSecretsProvider implements SecretsProvider {
     if (!command) return null;
     try {
       const stdout = execFileSync(
-        "/bin/sh",
+        resolveShell(),
         ["-c", command],
         helperExecOptions(key),
       );
@@ -218,7 +260,7 @@ export class CommandSecretsProvider implements SecretsProvider {
     if (!command) return {};
     try {
       const stdout = execFileSync(
-        "/bin/sh",
+        resolveShell(),
         ["-c", command],
         helperExecOptions(""),
       );
