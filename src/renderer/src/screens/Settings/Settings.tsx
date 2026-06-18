@@ -112,6 +112,53 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
   const [apiServerKeyMissing, setApiServerKeyMissing] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
 
+  // Claude Code Bridge — live status pill ("up to date" / "syncing" / "error" / "off")
+  const [bridgeStatus, setBridgeStatus] = useState<
+    "ok" | "syncing" | "error" | "off" | "checking"
+  >("checking");
+  const [bridgeStats, setBridgeStats] = useState<{
+    total: number;
+    full: number;
+    queued: number;
+  } | null>(null);
+  const bridgeBusy = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    const BRIDGE = "http://127.0.0.1:8770";
+    async function tick() {
+      if (!alive || bridgeBusy.current) return;
+      bridgeBusy.current = true;
+      try {
+        const r = await fetch(`${BRIDGE}/api/status`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!r.ok) throw new Error("status");
+        const d = await r.json();
+        if (alive) {
+          setBridgeStats({
+            total: d.stats?.total ?? 0,
+            full: d.stats?.full ?? 0,
+            queued: d.stats?.queued ?? 0,
+          });
+          setBridgeStatus(d.status === "syncing" ? "syncing" : "ok");
+        }
+      } catch {
+        if (alive) {
+          setBridgeStatus("off");
+          setBridgeStats(null);
+        }
+      } finally {
+        bridgeBusy.current = false;
+      }
+    }
+    tick();
+    const iv = setInterval(tick, 5000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, []);
+
   // SSH connection state
   const [sshHost, setSshHost] = useState("");
   const [sshPort, setSshPort] = useState("");
@@ -1146,6 +1193,110 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
               style={{ marginTop: 8 }}
             >
               {importResult}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">
+          Claude Code Bridge
+          <span
+            style={{
+              marginLeft: 10,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "2px 10px",
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 600,
+              verticalAlign: "middle",
+              background:
+                bridgeStatus === "ok"
+                  ? "rgba(16,185,129,.15)"
+                  : bridgeStatus === "syncing"
+                    ? "rgba(245,158,11,.15)"
+                    : bridgeStatus === "error"
+                      ? "rgba(239,68,68,.15)"
+                      : "rgba(107,114,128,.2)",
+              color:
+                bridgeStatus === "ok"
+                  ? "#10b981"
+                  : bridgeStatus === "syncing"
+                    ? "#f59e0b"
+                    : bridgeStatus === "error"
+                      ? "#ef4444"
+                      : "#9ca3af",
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "currentColor",
+                boxShadow:
+                  bridgeStatus === "syncing"
+                    ? "0 0 6px currentColor"
+                    : "none",
+              }}
+            />
+            {bridgeStatus === "ok"
+              ? "Up to date"
+              : bridgeStatus === "syncing"
+                ? "Syncing…"
+                : bridgeStatus === "error"
+                  ? "Error"
+                  : bridgeStatus === "checking"
+                    ? "Checking…"
+                    : "Offline"}
+          </span>
+        </div>
+        <div className="settings-field">
+          <div className="settings-field-hint" style={{ marginBottom: 10 }}>
+            Mirror your Claude Code desktop sessions, settings, and sidebar
+            groups into Hermes. The bridge runs locally and only syncs what you
+            choose.
+            {bridgeStats && (
+              <>
+                {" "}
+                <strong>{bridgeStats.full}</strong> of{" "}
+                <strong>{bridgeStats.total}</strong> sessions have full content
+                {bridgeStats.queued > 0 && (
+                  <>
+                    {" "}
+                    · <strong>{bridgeStats.queued}</strong> queued
+                  </>
+                )}
+                .
+              </>
+            )}
+          </div>
+          <div className="settings-hermes-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                void window.hermesAPI.openExternal?.(
+                  "http://127.0.0.1:8770/",
+                );
+              }}
+              disabled={bridgeStatus === "off" || bridgeStatus === "checking"}
+            >
+              <Send size={14} style={{ marginRight: 6 }} />
+              Open Bridge Panel
+            </button>
+          </div>
+          {bridgeStatus === "off" && (
+            <div
+              className="settings-field-hint"
+              style={{ marginTop: 8, color: "#9ca3af" }}
+            >
+              Bridge server not running. Start it with{" "}
+              <code>
+                python C:\Dev\tools\hermes-cc-bridge\hermes_cc_bridge_server.py
+              </code>
+              .
             </div>
           )}
         </div>
