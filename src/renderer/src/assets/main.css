@@ -1489,6 +1489,19 @@ body {
   }
 }
 
+/* Row wrapper: holds the open-button + the ⋮ menu side by side. The menu
+   button is revealed on hover/focus-within (ChatGPT-style). */
+.sidebar-recent-session-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+
+.sidebar-recent-session-row.active {
+  background: var(--accent-subtle);
+}
+
 .sidebar-recent-session {
   display: flex;
   align-items: center;
@@ -1503,6 +1516,127 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   transition: all var(--transition);
+}
+
+/* The open-button fills the row so the title is fully clickable; the menu
+   button is laid out after it. */
+.sidebar-recent-session-open {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Pin star marker pushed to the end of the title row. */
+.sidebar-recent-session-pin {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 10px;
+  color: var(--accent-text, var(--accent));
+  flex-shrink: 0;
+}
+
+/* ⋮ menu container: reserve no layout space until revealed so titles keep
+   their full width. */
+.sidebar-recent-session-menu {
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+/* The popover is portalled to document.body (to escape the sidebar's
+   overflow:hidden clip), positioned via inline fixed top/left. Override the
+   base absolute positioning and float above all app chrome. */
+.sidebar-recent-session-popover {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 1000;
+  /* Tighter than the Sessions-screen card menu — a compact sidebar popover. */
+  min-width: 184px;
+  padding: 3px;
+  gap: 0;
+}
+.sidebar-recent-session-popover button[role="menuitem"] {
+  padding: 5px 9px;
+  font-size: 12.5px;
+  gap: 7px;
+}
+
+.sidebar-recent-session-menu .sessions-card-menu-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  opacity: 0;
+}
+
+/* Reveal the ⋮ on row hover, on keyboard focus within the row, or while its
+   own menu is open (aria-expanded). Always visible on the active row. */
+.sidebar-recent-session-row:hover .sessions-card-menu-btn,
+.sidebar-recent-session-row:focus-within .sessions-card-menu-btn,
+.sidebar-recent-session-row.active .sessions-card-menu-btn,
+.sidebar-recent-session-menu .sessions-card-menu-btn[aria-expanded="true"] {
+  opacity: 0.8;
+}
+.sidebar-recent-session-menu .sessions-card-menu-btn:hover,
+.sidebar-recent-session-menu .sessions-card-menu-btn:focus-visible {
+  opacity: 1;
+}
+
+/* Inline rename input — sized to match the row. */
+.sidebar-recent-session-rename {
+  flex: 1;
+  min-width: 0;
+  margin: 2px 6px;
+  padding: 5px 8px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+/* Delete confirmation popover anchored under the row. */
+.sidebar-recent-session-delete-confirm {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 90;
+  padding: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.sidebar-recent-session-delete-confirm p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.sidebar-recent-session-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sidebar-recent-session-delete-actions button {
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sidebar-recent-session-delete-actions button:hover {
+  background: var(--bg-tertiary);
+}
+.sidebar-recent-session-delete-actions button.sessions-menu-danger {
+  border-color: var(--danger, #e06c75);
+}
+.sidebar-recent-session-delete-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .sidebar-recent-session-dot {
@@ -3503,6 +3637,43 @@ body {
 
 .chat-btw-btn:hover {
   background: var(--bg-active);
+}
+
+/* LLM Council convene button — distinct accent-tinted affordance, sits at the
+   right of the toolbar just before the send group. */
+.chat-council-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle, var(--bg-hover));
+  border: 1px solid var(--accent-subtle, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 2px;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+
+.chat-council-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.chat-council-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Gauge now lives at the far right of the toolbar (after the send group). */
+.chat-input-toolbar .chat-ctx-gauge {
+  margin-left: 6px;
 }
 
 /* ── Attachments ────────────────────────────────────── */
@@ -11144,4 +11315,304 @@ body {
   font-size: 12px;
   color: #e06c75;
   padding: 4px 0;
+}
+
+/* ══════════════════════════════════════════════════════════
+   LLM Council tab (Models screen)
+   ══════════════════════════════════════════════════════════ */
+.council-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 40px;
+}
+.council-loading {
+  padding: 30px;
+  color: var(--text-muted);
+}
+.council-intro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.council-cost-chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.council-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: var(--bg-secondary);
+}
+.council-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.council-section-head h3 {
+  margin: 0;
+  font-size: 14px;
+  flex: 1;
+}
+.council-chairman-select,
+.council-member-pos-select {
+  width: 100%;
+  margin-top: 8px;
+}
+.council-add-member {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  align-items: center;
+}
+.council-add-member .input {
+  flex: 1;
+}
+.council-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 10px 0;
+}
+.council-members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.council-member-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--bg-primary);
+}
+.council-member-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.council-member-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.council-member-remove {
+  color: var(--text-muted);
+}
+.council-member-pos-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+.council-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.council-badge-free {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.council-badge-paid {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+.council-badge-builtin {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+.council-positions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.council-position-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--bg-primary);
+}
+.council-position-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.council-position-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.council-position-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.council-position-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.council-position-learn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.council-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  background: var(--bg-hover);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.council-vote:hover {
+  background: var(--bg-active);
+}
+.council-learn-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.council-proposed {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+}
+.council-proposed-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.council-proposed-text {
+  font-size: 12px;
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.council-proposed-actions {
+  display: flex;
+  gap: 6px;
+}
+.council-advisor-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.council-advisor-free {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+.council-advice-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.council-advice-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.council-advice-top {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-subtle);
+}
+.council-advice-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.council-advice-best {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.council-advice-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+.council-advice-tiers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.council-tier,
+.council-speed,
+.council-ctx {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.council-tier-excellent {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.council-tier-strong {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+.council-tier-fair {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+.council-tier-basic {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+.council-speed,
+.council-ctx {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.council-advice-reason {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.council-desc-textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.council-reset {
+  align-self: flex-start;
+  color: var(--text-muted);
 }

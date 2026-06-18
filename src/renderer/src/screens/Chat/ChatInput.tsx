@@ -8,6 +8,7 @@ import {
   useImperativeHandle,
 } from "react";
 import { Square as Stop, Slash, Paperclip, Mic, ArrowUp } from "lucide-react";
+import { CouncilIcon } from "../../assets/icons";
 import { isImeComposing } from "./keyboard";
 import { useI18n } from "../../components/useI18n";
 import { SLASH_COMMANDS, type SlashCommand } from "./slashCommands";
@@ -55,6 +56,8 @@ interface ChatInputProps {
   toolbarExtras?: React.ReactNode;
   onSubmit: (text: string, attachments: Attachment[]) => void;
   onQuickAsk: (text: string, attachments: Attachment[]) => void;
+  /** Convene the LLM Council on the current draft (or last turn if empty). */
+  onCouncil?: (text: string) => void;
   onAbort: () => void;
 }
 
@@ -71,6 +74,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       toolbarExtras,
       onSubmit,
       onQuickAsk,
+      onCouncil,
       onAbort,
     },
     ref,
@@ -267,6 +271,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const sendAttachments = attachments;
       clearAfterSend(text);
       onQuickAsk(text, sendAttachments);
+    }
+
+    // Convene the LLM Council. Uses the current draft; if empty, the parent
+    // falls back to the last user turn. Clears the composer like a send.
+    function handleCouncil(): void {
+      if (!onCouncil) return;
+      const text = input.trim();
+      if (text) clearAfterSend(text);
+      onCouncil(text);
     }
 
     function handleSlashSelect(cmd: SlashCommand): void {
@@ -546,8 +559,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               </>
             )}
             <div className="chat-input-toolbar-spacer" />
-            {contextUsage && contextUsage.used > 0 && (
-              <ContextGauge {...contextUsage} />
+            {onCouncil && (
+              <button
+                type="button"
+                className="chat-council-btn"
+                onClick={handleCouncil}
+                disabled={isLoading}
+                title={t("chat.councilTitle")}
+                aria-label={t("chat.council")}
+              >
+                <CouncilIcon size={16} />
+              </button>
             )}
             {isLoading ? (
               <button
@@ -577,6 +599,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <ArrowUp size={20} />
                 </button>
               </>
+            )}
+            {contextUsage && contextUsage.used > 0 && (
+              <ContextGauge {...contextUsage} />
             )}
           </div>
         </div>

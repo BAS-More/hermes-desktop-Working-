@@ -22,9 +22,11 @@ import {
   Sparkles,
   Check,
   ExternalLink,
+  CouncilIcon,
 } from "../../assets/icons";
 import { LOCAL_PRESETS, PROVIDERS } from "../../constants";
 import { useI18n } from "../../components/useI18n";
+import { CouncilTab } from "./CouncilTab";
 import BrandLogo from "../../components/common/BrandLogo";
 import { detectProviderFromUrl } from "./detect-provider";
 import { useDiscoveredModels } from "../../hooks/useDiscoveredModels";
@@ -77,7 +79,7 @@ interface ModelsProps {
 
 function Models({ visible }: ModelsProps = {}): React.JSX.Element {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<"models" | "auxiliary">("models");
+  const [activeTab, setActiveTab] = useState<"models" | "auxiliary" | "council">("models");
   const [models, setModels] = useState<SavedModel[]>([]);
   const [search, setSearch] = useState("");
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
@@ -535,6 +537,13 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
           <Wrench size={16} />
           {t("constants.auxiliaryTitle")}
         </button>
+        <button
+          className={`models-tab ${activeTab === "council" ? "active" : ""}`}
+          onClick={() => setActiveTab("council")}
+        >
+          <CouncilIcon size={16} />
+          {t("council.tabTitle")}
+        </button>
       </div>
 
       {activeTab === "models" && (
@@ -709,6 +718,10 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
             })}
           </div>
         </>
+      )}
+
+      {activeTab === "council" && (
+        <CouncilTab visible={visible && activeTab === "council"} />
       )}
 
       {showModal && (

@@ -7,6 +7,11 @@ import type {
   MessagingPlatformUpdate,
 } from "../shared/messaging-platforms";
 import type { ChatToolEvent } from "../shared/chat-stream";
+import type {
+  CouncilConfig,
+  CouncilAdviceResult,
+  CouncilModelAdvice,
+} from "../shared/council";
 
 /**
  * Mirror of the renderer-side `CredentialPoolEntry` ambient type
@@ -248,6 +253,59 @@ const hermesAPI = {
 
   resetAuxiliaryConfig: (profile?: string): Promise<boolean> =>
     ipcRenderer.invoke("reset-auxiliary-config", profile),
+
+  // LLM Council roster (desktop-side; consumed by the agent via PAL MCP).
+  councilGetConfig: (profile?: string): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-get-config", profile),
+  councilResetConfig: (profile?: string): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-reset-config", profile),
+  councilAddMember: (
+    member: { model: string; label?: string; free?: boolean; positionId?: string | null },
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-add-member", member, profile),
+  councilRemoveMember: (memberId: string, profile?: string): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-remove-member", memberId, profile),
+  councilAssignPosition: (
+    memberId: string,
+    positionId: string | null,
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-assign-position", memberId, positionId, profile),
+  councilSetChairman: (model: string, profile?: string): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-set-chairman", model, profile),
+  councilUpsertPosition: (
+    pos: { id?: string; title: string; description: string },
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-upsert-position", pos, profile),
+  councilDeletePosition: (positionId: string, profile?: string): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-delete-position", positionId, profile),
+  councilPositionFeedback: (
+    positionId: string,
+    vote: "up" | "down",
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-position-feedback", positionId, vote, profile),
+  councilProposeDescription: (
+    positionId: string,
+    proposed: string,
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-propose-description", positionId, proposed, profile),
+  councilResolveDescription: (
+    positionId: string,
+    accept: boolean,
+    profile?: string,
+  ): Promise<CouncilConfig> =>
+    ipcRenderer.invoke("council-resolve-description", positionId, accept, profile),
+  councilRecommendModels: (
+    taskKind: string,
+    preferFree?: boolean,
+  ): Promise<CouncilAdviceResult[]> =>
+    ipcRenderer.invoke("council-recommend-models", taskKind, preferFree),
+  councilModelAdvice: (): Promise<CouncilModelAdvice[]> =>
+    ipcRenderer.invoke("council-model-advice"),
 
   // Connection mode (local / remote / ssh)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),

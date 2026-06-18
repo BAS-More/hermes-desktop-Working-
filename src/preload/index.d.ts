@@ -13,6 +13,11 @@ import type {
   MessagingPlatformUpdate,
 } from "../shared/messaging-platforms";
 import type { ChatToolEvent } from "../shared/chat-stream";
+import type {
+  CouncilConfig,
+  CouncilModelAdvice,
+  CouncilAdviceResult,
+} from "../shared/council";
 
 interface ElectronAPI {
   process: {
@@ -368,6 +373,46 @@ interface HermesAPI {
     profile?: string,
   ) => Promise<boolean>;
   resetAuxiliaryConfig: (profile?: string) => Promise<boolean>;
+
+  // LLM Council roster + advisor
+  councilGetConfig: (profile?: string) => Promise<CouncilConfig>;
+  councilResetConfig: (profile?: string) => Promise<CouncilConfig>;
+  councilAddMember: (
+    member: { model: string; label?: string; free?: boolean; positionId?: string | null },
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilRemoveMember: (memberId: string, profile?: string) => Promise<CouncilConfig>;
+  councilAssignPosition: (
+    memberId: string,
+    positionId: string | null,
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilSetChairman: (model: string, profile?: string) => Promise<CouncilConfig>;
+  councilUpsertPosition: (
+    pos: { id?: string; title: string; description: string },
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilDeletePosition: (positionId: string, profile?: string) => Promise<CouncilConfig>;
+  councilPositionFeedback: (
+    positionId: string,
+    vote: "up" | "down",
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilProposeDescription: (
+    positionId: string,
+    proposed: string,
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilResolveDescription: (
+    positionId: string,
+    accept: boolean,
+    profile?: string,
+  ) => Promise<CouncilConfig>;
+  councilRecommendModels: (
+    taskKind: string,
+    preferFree?: boolean,
+  ) => Promise<CouncilAdviceResult[]>;
+  councilModelAdvice: () => Promise<CouncilModelAdvice[]>;
   setModelConfig: (
     provider: string,
     model: string,

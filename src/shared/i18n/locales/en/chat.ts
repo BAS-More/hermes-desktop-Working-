@@ -7,6 +7,9 @@ export default {
   typeMessage: "Type a message... (Shift+Enter for new line)",
   quickAskTitle:
     "Quick Ask (/btw) — side question that won't affect conversation context",
+  council: "LLM Council",
+  councilTitle:
+    "Convene the LLM Council — a panel of models debate your question, then synthesize one answer (~free panel, runs ~1-3 min)",
   send: "Send",
   searchModels: "Search models...",
   custom: "Custom",

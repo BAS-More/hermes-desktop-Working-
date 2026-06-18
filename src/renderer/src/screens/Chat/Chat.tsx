@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Zap } from "lucide-react";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import { buildCouncilPrompt } from "./councilPrompt";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { MessageList } from "./MessageList";
 import { ModelPicker } from "./ModelPicker";
@@ -394,6 +395,29 @@ function Chat({
     chatInputRef.current?.setText(text);
   }, []);
 
+  // Convene the LLM Council on the given text (or the last user turn if empty).
+  // Builds the convene instruction from the saved roster and submits it through
+  // the normal pipeline — the agent runs the panel via PAL MCP and synthesizes.
+  const handleCouncil = useCallback(
+    async (text: string) => {
+      let question = text.trim();
+      if (!question) {
+        // Fall back to the most recent user message.
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if (m.role === "user" && "content" in m && m.content.trim()) {
+            question = m.content.trim();
+            break;
+          }
+        }
+      }
+      const cfg = await window.hermesAPI.councilGetConfig(profile);
+      const prompt = buildCouncilPrompt(cfg, question);
+      handleSubmitOrQueue(prompt, []);
+    },
+    [messages, profile, handleSubmitOrQueue],
+  );
+
   const handlePickFolder = useCallback(async () => {
     const path = await window.hermesAPI.selectFolder();
     if (path) setContextFolder(path);
@@ -524,6 +548,7 @@ function Chat({
           readiness={readiness}
           onSubmit={handleSubmitOrQueue}
           onQuickAsk={actions.handleQuickAsk}
+          onCouncil={handleCouncil}
           onAbort={actions.handleAbort}
           toolbarExtras={
             <>

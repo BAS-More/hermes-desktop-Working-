@@ -137,6 +137,20 @@ import {
   resetAuxiliaryToAuto,
 } from "./auxiliary-config";
 import {
+  getCouncilConfig,
+  resetCouncilConfig,
+  addCouncilMember,
+  removeCouncilMember,
+  assignMemberPosition,
+  setChairman as setCouncilChairman,
+  upsertPosition,
+  deletePosition,
+  recordPositionFeedback,
+  proposePositionDescription,
+  resolveProposedDescription,
+} from "./council-config";
+import { recommendModels, MODEL_ADVICE } from "./council-advisor";
+import {
   listSessions,
   getSessionMessages,
   searchSessions,
@@ -844,6 +858,69 @@ function setupIPC(): void {
 
     return true;
   });
+
+  // ---- LLM Council config (desktop-side roster; consumed by the agent via a
+  // convene prompt that calls PAL MCP). Stored in council-config.json, NOT
+  // config.yaml — no gateway restart needed since the agent reads it per run.
+  ipcMain.handle("council-get-config", (_event, profile?: string) =>
+    getCouncilConfig(profile),
+  );
+  ipcMain.handle("council-reset-config", (_event, profile?: string) =>
+    resetCouncilConfig(profile),
+  );
+  ipcMain.handle(
+    "council-add-member",
+    (
+      _event,
+      member: { model: string; label?: string; free?: boolean; positionId?: string | null },
+      profile?: string,
+    ) => addCouncilMember(member, profile),
+  );
+  ipcMain.handle("council-remove-member", (_event, memberId: string, profile?: string) =>
+    removeCouncilMember(memberId, profile),
+  );
+  ipcMain.handle(
+    "council-assign-position",
+    (_event, memberId: string, positionId: string | null, profile?: string) =>
+      assignMemberPosition(memberId, positionId, profile),
+  );
+  ipcMain.handle("council-set-chairman", (_event, model: string, profile?: string) =>
+    setCouncilChairman(model, profile),
+  );
+  ipcMain.handle(
+    "council-upsert-position",
+    (
+      _event,
+      pos: { id?: string; title: string; description: string },
+      profile?: string,
+    ) => upsertPosition(pos, profile),
+  );
+  ipcMain.handle("council-delete-position", (_event, positionId: string, profile?: string) =>
+    deletePosition(positionId, profile),
+  );
+  ipcMain.handle(
+    "council-position-feedback",
+    (_event, positionId: string, vote: "up" | "down", profile?: string) =>
+      recordPositionFeedback(positionId, vote, profile),
+  );
+  ipcMain.handle(
+    "council-propose-description",
+    (_event, positionId: string, proposed: string, profile?: string) =>
+      proposePositionDescription(positionId, proposed, profile),
+  );
+  ipcMain.handle(
+    "council-resolve-description",
+    (_event, positionId: string, accept: boolean, profile?: string) =>
+      resolveProposedDescription(positionId, accept, profile),
+  );
+  // Advisor: rank the model pool for a task kind (item 2e). Pure/static +
+  // feedback-nudged tiers; no network call, returns instantly.
+  ipcMain.handle(
+    "council-recommend-models",
+    (_event, taskKind: string, preferFree?: boolean) =>
+      recommendModels(taskKind, { preferFree: preferFree ?? true }),
+  );
+  ipcMain.handle("council-model-advice", () => MODEL_ADVICE);
 
   // API_SERVER_KEY management — lets the renderer detect a missing key and
   // generate one with a button click (local mode) or show instructions (remote/SSH).

@@ -29,6 +29,7 @@ import installEn from "./locales/en/install";
 import constantsEn from "./locales/en/constants";
 import kanbanEn from "./locales/en/kanban";
 import diagnoseEn from "./locales/en/diagnose";
+import councilEn from "./locales/en/council";
 import commonPl from "./locales/pl/common";
 import navigationPl from "./locales/pl/navigation";
 import welcomePl from "./locales/pl/welcome";
@@ -246,6 +247,7 @@ export const resources = {
       constants: constantsEn,
       kanban: kanbanEn,
       diagnose: diagnoseEn,
+      council: councilEn,
     },
   },
   pl: {
