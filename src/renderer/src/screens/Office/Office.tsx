@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Crown, Move, RefreshCw, Users, X } from "lucide-react";
+import { Crown, Move, RefreshCw, Settings, Users, X } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 import oneChatIcon from "../../assets/images/one-chat.svg";
 import OneChatModal from "./OneChatModal";
+import AgentDetail from "../Agents/AgentDetail";
 import Office3D from "./office3d/Office3D";
 import {
   profilesToOfficeAgents,
@@ -40,6 +41,8 @@ function Office({ visible }: OfficeProps): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ceoId, setCeoId] = useState<string | null>(readStoredCeo);
   const [chatOpen, setChatOpen] = useState(false);
+  // Profile whose per-agent config panel (persona/skills/tools) is open.
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
   // Developer building-mover: click a building, then click ground to reposition
   // it; positions are logged to the console so the cityPlan constants can be
   // updated to match.
@@ -511,7 +514,41 @@ function Office({ visible }: OfficeProps): React.JSX.Element {
               <Crown size={15} />
               {selectedIsCeo ? t("office.removeCeo") : t("office.makeCeo")}
             </button>
+
+            <button
+              type="button"
+              onClick={() => setConfiguringId(selectedAgent.id)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "rgba(255,255,255,0.06)",
+                color: "rgba(255,255,255,0.9)",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <Settings size={15} />
+              {t("agents.configure")}
+            </button>
           </aside>
+        )}
+
+        {configuringId && (
+          <AgentDetail
+            profile={configuringId}
+            color={agents.find((a) => a.id === configuringId)?.color}
+            initialTab="persona"
+            onClose={() => {
+              setConfiguringId(null);
+              void loadAgents();
+            }}
+          />
         )}
 
         {!loading && agents.length === 0 && (

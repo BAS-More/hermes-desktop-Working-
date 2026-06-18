@@ -701,6 +701,7 @@ function Layout({
                 activeProfile={activeProfile}
                 onSelectProfile={handleSelectProfile}
                 onChatWith={handleChatWithProfile}
+                onBrowseSkills={() => focusDiscover("skills")}
               />
             )}
           </div>
