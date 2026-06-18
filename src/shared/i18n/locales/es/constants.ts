@@ -25,7 +25,8 @@ export default {
   nousDesc: "Nivel gratuito disponible",
   nousTag: "",
   nousApiKey: "API key de Nous Portal",
-  nousHint: "Clave de API de Nous Portal — usa la tarjeta OAuth a continuación si tienes una suscripción de Nous",
+  nousHint:
+    "Clave de API de Nous Portal — usa la tarjeta OAuth a continuación si tienes una suscripción de Nous",
   localName: "Local",
   localDesc: "Compatible con OpenAI",
   localTag: "",

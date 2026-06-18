@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import {
   Plus,
@@ -43,6 +43,8 @@ interface SavedModel {
   provider: string;
   model: string;
   baseUrl: string;
+  /** Optional manual context-window override (tokens); empty when auto. */
+  contextLength?: number;
   createdAt: number;
 }
 
@@ -124,9 +126,12 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
   const [formProvider, setFormProvider] = useState("openrouter");
   const [formModel, setFormModel] = useState("");
   const [formBaseUrl, setFormBaseUrl] = useState("");
+  // Optional manual context-window override (tokens). Empty string = auto.
+  const [formContextLength, setFormContextLength] = useState("");
   const [formApiKey, setFormApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [formError, setFormError] = useState("");
+  const loadSeqRef = useRef(0);
   // Whether the user has manually picked a value from the Provider dropdown
   // for this open of the modal. While false, the dropdown follows whatever
   // detectProviderFromUrl() infers from the Base URL field. Once the user
@@ -135,9 +140,15 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
   const [providerAutoFilled, setProviderAutoFilled] = useState(false);
 
   const loadModels = useCallback(async () => {
-    const list = await window.hermesAPI.listModels();
-    setModels(list);
-    setLoading(false);
+    const seq = ++loadSeqRef.current;
+    setLoading(true);
+    try {
+      const list = await window.hermesAPI.listModels();
+      if (seq !== loadSeqRef.current) return;
+      setModels(list);
+    } finally {
+      if (seq === loadSeqRef.current) setLoading(false);
+    }
   }, []);
 
   const loadAuxConfig = useCallback(async () => {
@@ -193,6 +204,22 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
     }
   }, [visible, loadModels, loadAuxConfig]);
 
+  useEffect(() => {
+    return window.hermesAPI.onConnectionConfigChanged(() => {
+      setModels([]);
+      setProviderFilter(null);
+      setSearch("");
+      void loadModels();
+      void loadAuxConfig();
+    });
+  }, [loadModels, loadAuxConfig]);
+
+  useEffect(() => {
+    return window.hermesAPI.onModelLibraryChanged(() => {
+      void loadModels();
+    });
+  }, [loadModels]);
+
   // Live model discovery for the Add/Edit modal — feeds an HTML
   // <datalist> off the Model ID input.  Pauses when the modal is closed
   // so we don't fire background requests on every keystroke elsewhere.
@@ -216,6 +243,7 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
     setFormProvider("openrouter");
     setFormModel("");
     setFormBaseUrl("");
+    setFormContextLength("");
     setFormApiKey("");
     setShowApiKey(false);
     setFormError("");
@@ -230,6 +258,9 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
     setFormProvider(m.provider);
     setFormModel(m.model);
     setFormBaseUrl(m.baseUrl);
+    setFormContextLength(
+      m.contextLength && m.contextLength > 0 ? String(m.contextLength) : "",
+    );
     // Read back the saved API key so the user sees what's actually
     // configured — previously the field was always reset to empty,
     // which made the dialog look like the key was missing even when
@@ -295,6 +326,11 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
       setFormError(t("models.nameRequired"));
       return;
     }
+    // Parse the optional context-window override. Empty/invalid → undefined
+    // (auto-detect); on edit we pass `null` to explicitly clear a prior value.
+    const ctxParsed = parseInt(formContextLength.trim(), 10);
+    const contextLength =
+      Number.isFinite(ctxParsed) && ctxParsed > 0 ? ctxParsed : undefined;
     setFormError("");
 
     if (editingModel) {
@@ -313,12 +349,17 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
         activeBefore.provider === editingModel.provider &&
         activeBefore.model === editingModel.model;
 
-      await window.hermesAPI.updateModel(editingModel.id, {
-        name,
-        provider: formProvider,
-        model,
-        baseUrl: formBaseUrl.trim(),
-      });
+      await window.hermesAPI.updateModel(
+        editingModel.id,
+        {
+          name,
+          provider: formProvider,
+          model,
+          baseUrl: formBaseUrl.trim(),
+        },
+        // null explicitly clears the override when the field is emptied.
+        contextLength ?? null,
+      );
 
       // Mirror the new values into config.yaml when this edit affects
       // the active model. The empty-baseUrl case is handled by
@@ -341,6 +382,7 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
         formProvider,
         model,
         formBaseUrl.trim(),
+        contextLength,
       );
     }
 
@@ -498,7 +540,7 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
         {activeTab === "models" && (
           <div className="models-header-actions">
             <a
-              href="https://github.com/fathah/hermes-registry"
+              href="https://github.com/hermesonehq/hermes-registry"
               target="_blank"
               rel="noreferrer"
               className="btn btn-secondary btn-sm"
@@ -875,6 +917,24 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
                 />
                 <span className="models-modal-hint">
                   {t("models.customProviderHint")}
+                </span>
+              </div>
+
+              <div className="models-modal-field">
+                <label className="models-modal-label">
+                  {t("models.contextWindowLabel")} ({t("common.optional")})
+                </label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step={1024}
+                  value={formContextLength}
+                  onChange={(e) => setFormContextLength(e.target.value)}
+                  placeholder={t("models.contextWindowPlaceholder")}
+                />
+                <span className="models-modal-hint">
+                  {t("models.contextWindowHint")}
                 </span>
               </div>
 

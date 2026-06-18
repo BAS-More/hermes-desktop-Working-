@@ -667,6 +667,7 @@ function Sessions({
   const [newGroupName, setNewGroupName] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestId = useRef(0);
+  const loadRequestId = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -705,22 +706,42 @@ function Sessions({
   }, []);
 
   const refreshSessions = useCallback(async (): Promise<void> => {
+    const requestId = ++loadRequestId.current;
     const synced = await window.hermesAPI.syncAllSessionCaches();
-    setSessions(synced as SessionRow[]);
+    if (loadRequestId.current !== requestId) return;
+    setSessions((prev) => {
+      if (synced.length === 0 && prev.length > 0) {
+        return prev;
+      }
+      return synced as SessionRow[];
+    });
   }, []);
 
   const loadSessions = useCallback(async (): Promise<void> => {
+    const requestId = ++loadRequestId.current;
     setLoading(true);
     try {
       const cached = await window.hermesAPI.listAllSessions(200);
+      if (loadRequestId.current !== requestId) return;
       if (cached.length > 0) setSessions(cached as SessionRow[]);
       const synced = await window.hermesAPI.syncAllSessionCaches();
+      if (loadRequestId.current !== requestId) return;
       setSessions(synced as SessionRow[]);
       await loadGroups();
     } catch (error) {
       console.error("Failed to load sessions", error);
+      try {
+        const cached = await window.hermesAPI.listCachedSessions(50);
+        if (loadRequestId.current === requestId) {
+          setSessions(cached as SessionRow[]);
+        }
+      } catch (cacheError) {
+        console.error("Failed to load cached sessions", cacheError);
+      }
     } finally {
-      setLoading(false);
+      if (loadRequestId.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [loadGroups]);
 
@@ -1004,7 +1025,23 @@ function Sessions({
     if (visible) loadSessions();
   }, [visible, loadSessions]);
 
-  // Periodic re-sync while visible.
+  useEffect(() => {
+    const unsubscribe = window.hermesAPI.onConnectionConfigChanged(() => {
+      setSessions([]);
+      setSearchResults([]);
+      setSearchQuery("");
+      setSelectedSessionIds(new Set());
+      setIsSelectionMode(false);
+      void loadSessions();
+    });
+    return unsubscribe;
+  }, [loadSessions]);
+
+  // While the Sessions tab is actually showing, periodically re-sync so
+  // sessions created in the background — cron jobs, gateway platforms, or
+  // another device writing the same state.db — surface even if the user
+  // just leaves this tab open. Also refresh when the window regains focus.
+  // Gated on `visible`: no timer and no DB reads while another screen shows.
   useEffect(() => {
     if (!visible) return;
     const timer = setInterval(() => {
@@ -1035,6 +1072,8 @@ function Sessions({
     setIsSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
+        await window.hermesAPI.syncAllSessionCaches().catch(() => []);
+        if (searchRequestId.current !== requestId) return;
         const results = await window.hermesAPI.searchAllSessions(query);
         if (searchRequestId.current !== requestId) return;
         setSearchResults(results as SearchRow[]);

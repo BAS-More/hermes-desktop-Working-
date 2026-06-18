@@ -71,6 +71,8 @@ export default {
   contextCache: "Cache: {{pct}}% hit ({{read}} read / {{write}} write)",
   removeAttachment: "Remove attachment",
   dropToAttach: "Drop files to attach",
+  dashboardUnavailableFallback:
+    "Dashboard chat isn't available on this connection — using basic chat. Profile switching and session history are limited.",
   attachUnsupported: "{{name}}: file type not supported",
   attachImageTooLarge: "{{name}}: image too large (max 50 MB)",
   attachImageUncompressible:
@@ -135,6 +137,7 @@ export default {
   queuedCount: "{{count}} queued",
   queuedAttachment: "{{count}} attachment(s)",
   queuedCancel: "Remove from queue",
+  copyMessage: "Copy message",
   worktree: {
     loading: "Loading",
     empty: "Folder is empty",
@@ -163,5 +166,12 @@ export default {
     noBuilds: "No active builds.",
     loading: "Loading factory status…",
     unsupported: "The factory requires a local Hermes install or SSH tunnel.",
+  },
+  followUs: {
+    title: "Follow Us on X",
+    description:
+      "Stay up to date with the latest Hermes One features, tips, and updates. Follow us on X!",
+    follow: "Follow",
+    notNow: "Not Now",
   },
 } as const;

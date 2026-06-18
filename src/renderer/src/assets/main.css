@@ -48,7 +48,7 @@
   --code-bg: #1a1a1a;
   --scrollbar-thumb: #424242;
   --scrollbar-hover: #555555;
-  --selection: rgba(0, 63, 122, 0.4);
+  --selection: rgba(0, 100, 180, 0.7);
 }
 
 /* ----- Light Theme ----- */
@@ -83,7 +83,7 @@
   --code-bg: #f5f5f5;
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-hover: #bbbbbb;
-  --selection: rgba(0, 63, 122, 0.2);
+  --selection: rgba(0, 63, 122, 0.3);
 }
 
 /* ----- Dracula ----- */
@@ -118,7 +118,7 @@
   --code-bg: #21222c;
   --scrollbar-thumb: #44475a;
   --scrollbar-hover: #6272a4;
-  --selection: rgba(189, 147, 249, 0.35);
+  --selection: rgba(189, 147, 249, 0.7);
 }
 
 /* ----- Nord ----- */
@@ -153,7 +153,7 @@
   --code-bg: #272c36;
   --scrollbar-thumb: #434c5e;
   --scrollbar-hover: #4c566a;
-  --selection: rgba(136, 192, 208, 0.3);
+  --selection: rgba(136, 192, 208, 0.7);
 }
 
 /* ----- One Dark ----- */
@@ -188,7 +188,7 @@
   --code-bg: #21252b;
   --scrollbar-thumb: #3e4451;
   --scrollbar-hover: #4b5263;
-  --selection: rgba(97, 175, 239, 0.3);
+  --selection: rgba(97, 175, 239, 0.7);
 }
 
 /* ----- GitHub Dark ----- */
@@ -223,7 +223,7 @@
   --code-bg: #161b22;
   --scrollbar-thumb: #30363d;
   --scrollbar-hover: #484f58;
-  --selection: rgba(56, 139, 253, 0.3);
+  --selection: rgba(56, 139, 253, 0.7);
 }
 
 /* ----- Monokai ----- */
@@ -258,7 +258,7 @@
   --code-bg: #1e1f1c;
   --scrollbar-thumb: #49483e;
   --scrollbar-hover: #75715e;
-  --selection: rgba(102, 217, 239, 0.3);
+  --selection: rgba(102, 217, 239, 0.7);
 }
 
 /* ----- Solarized Dark ----- */
@@ -293,7 +293,7 @@
   --code-bg: #00252e;
   --scrollbar-thumb: #073642;
   --scrollbar-hover: #586e75;
-  --selection: rgba(38, 139, 210, 0.3);
+  --selection: rgba(38, 139, 210, 0.7);
 }
 
 /* ----- Gruvbox Dark ----- */
@@ -328,7 +328,7 @@
   --code-bg: #1d2021;
   --scrollbar-thumb: #504945;
   --scrollbar-hover: #665c54;
-  --selection: rgba(131, 165, 152, 0.3);
+  --selection: rgba(131, 165, 152, 0.7);
 }
 
 /* ----- Tokyo Night ----- */
@@ -363,7 +363,7 @@
   --code-bg: #16161e;
   --scrollbar-thumb: #343b58;
   --scrollbar-hover: #565f89;
-  --selection: rgba(122, 162, 247, 0.3);
+  --selection: rgba(122, 162, 247, 0.7);
 }
 
 /* ----- GitHub Light ----- */
@@ -398,7 +398,7 @@
   --code-bg: #f6f8fa;
   --scrollbar-thumb: #d0d7de;
   --scrollbar-hover: #afb8c1;
-  --selection: rgba(9, 105, 218, 0.2);
+  --selection: rgba(9, 105, 218, 0.3);
 }
 
 /* ----- Solarized Light ----- */
@@ -433,7 +433,7 @@
   --code-bg: #eee8d5;
   --scrollbar-thumb: #d3cbb0;
   --scrollbar-hover: #b9b393;
-  --selection: rgba(38, 139, 210, 0.2);
+  --selection: rgba(38, 139, 210, 0.3);
 }
 
 /* ----- Manrope ----- */
@@ -499,7 +499,7 @@ body {
 
 /* ----- App Shell ----- */
 .app {
-  height: 97vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -1271,7 +1271,9 @@ body {
   transition:
     width var(--transition),
     padding var(--transition);
-  border-radius: 16px;
+  /* Flush full-height panel: square right edge against the content, left
+     corners kept rounded to follow the window's rounded corners. */
+  border-radius: 16px 0 0 16px;
 }
 
 .sidebar-collapsed .sidebar {
@@ -1290,7 +1292,9 @@ body {
 .sidebar-logo {
   height: 30px;
   width: 150px;
-  background-color: var(--primary-yellow);
+  /* Follow the foreground colour (white on dark themes, black on light) rather
+     than a fixed brand yellow, so the wordmark always reads against the bg. */
+  background-color: var(--text-primary);
   mask-repeat: no-repeat;
   mask-position: center;
   mask-size: contain;
@@ -1693,11 +1697,23 @@ body {
 /* ── Active sessions bar (concurrent / multi-agent runs) ── */
 .active-sessions-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  /* Tabs stretch to the full strip height so the active tab's fill reaches the
+     bottom edge and merges seamlessly into the content below. */
+  align-items: stretch;
+  gap: 0;
+  /* This strip IS the window's title-bar drag region (browser-style): empty
+     space drags the window. It sits above the global .drag-region (z 1000) so
+     it owns the top band of the content column; the chips opt back out of
+     dragging (no-drag) so they stay clickable. Always present — with no extra
+     tabs it's simply an empty drag area, costing no dedicated bar height. */
+  position: relative;
+  z-index: 1001;
+  -webkit-app-region: drag;
+  min-height: 34px;
+  padding: 0 8px 0 12px;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
+  /* Darker toolbar shade so the lighter active tab (--bg-primary) reads as
+     part of the page below it. */
   background: var(--bg-secondary);
   flex-shrink: 0;
   /* Scrollable but with no visible scrollbar. */
@@ -1709,41 +1725,59 @@ body {
   display: none;
 }
 
-/* On macOS the frameless window's 28px drag strip overlays the top of the
-   content and swallows clicks. Push the chips below it so they're fully
-   clickable. The strip only renders on mac (App.tsx), so non-mac keeps the
-   tight padding above. */
-.is-mac .active-sessions-bar {
-  padding-top: 34px;
-}
-
+/* Flat tab: no border or fill, just text. Adjacent tabs are separated by a thin
+   vertical divider (::before); the active tab fills with the page colour and
+   rounds its top so it looks docked to the content beneath. */
 .active-session-chip {
   display: flex;
   align-items: center;
   gap: 6px;
-  max-width: 150px;
+  max-width: 160px;
   flex-shrink: 0;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
+  /* Opt out of the strip's drag region so the chip is clickable. */
+  -webkit-app-region: no-drag;
+  position: relative;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: 12px;
   white-space: nowrap;
-  transition: all var(--transition);
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+/* Divider between two adjacent tabs (drawn on the right tab's left edge). */
+.active-session-chip + .active-session-chip::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--border-bright);
 }
 
 .active-session-chip:hover {
   color: var(--text-primary);
-  border-color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .active-session-chip.active {
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-  border-color: var(--accent-text, var(--accent));
+  /* Same colour as the content area below → the tab merges into the page. */
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Drop the dividers flanking the active tab so it reads as one docked panel. */
+.active-session-chip.active::before,
+.active-session-chip.active + .active-session-chip::before {
+  opacity: 0;
 }
 
 /* Loading state reuses an avatar-sized circle filled with the profile colour
@@ -1772,7 +1806,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.8;
+  opacity: 0.7;
+}
+
+/* The focused tab's label reads at full strength. */
+.active-session-chip.active .active-session-chip-title,
+.active-session-chip:hover .active-session-chip-title {
+  opacity: 1;
 }
 
 .active-session-chip-close {
@@ -2013,6 +2053,21 @@ body {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
+}
+
+.profile-menu-gateway {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+.profile-menu-gateway.active {
+  background: var(--success);
+  opacity: 1;
 }
 
 .profile-menu-meta {
@@ -2849,15 +2904,25 @@ body {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: var(--bg-elevated);
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 4px;
 }
 
-.chat-empty-icon img {
-  border-radius: 50%;
+/* The wordmark SVG ships with a black fill; recolour it to white via masking so
+   it reads on the black circle, regardless of the source artwork's colours. */
+.chat-empty-logo {
+  width: 52px;
+  height: 40px;
+  background-color: #fff;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
 }
 
 .chat-empty-text {
@@ -2957,11 +3022,6 @@ body {
   flex-shrink: 0;
 }
 
-.chat-avatar-user {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-}
-
 .chat-avatar-agent {
   border-radius: 10px;
   overflow: hidden;
@@ -2971,10 +3031,12 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 
 .chat-bubble {
+  position: relative;
   padding: 10px 16px;
   border-radius: var(--radius-lg);
   font-size: 14px;
@@ -3004,6 +3066,53 @@ body {
      .chat-bubble's pre-wrap, which would otherwise turn newlines
      between <li> tags into visible blank lines. */
   white-space: normal;
+}
+
+.chat-bubble-error {
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  background: var(--error-bg);
+}
+
+/* Copy button — hidden by default, shown on bubble hover */
+.chat-bubble-actions {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.chat-bubble:hover .chat-bubble-actions {
+  opacity: 1;
+}
+
+.chat-bubble-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.chat-bubble-copy:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-focus, var(--accent));
+}
+
+.chat-error-message {
+  color: var(--error);
+  font-weight: 500;
+  white-space: pre-wrap;
 }
 
 .chat-bubble-agent pre,
@@ -3040,6 +3149,33 @@ body {
   border-radius: 6px;
   overflow: hidden;
   margin: 6px 0 !important;
+}
+
+.chat-code-collapsed {
+  max-height: 180px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+
+.chat-code-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px;
+  background: var(--code-bg);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.chat-code-expand-btn:hover {
+  background: var(--bg-hover);
 }
 
 .chat-code-header {
@@ -5150,6 +5286,38 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+.settings-transport-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-transport-status span:first-child {
+  font-weight: 700;
+}
+
+.settings-transport-status code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.settings-transport-status--ok span:first-child {
+  color: var(--success, #22c55e);
+}
+
+.settings-transport-status--warn span:first-child {
+  color: var(--warning, #f59e0b);
 }
 
 .settings-input-row {
@@ -10063,6 +10231,57 @@ body {
   font-size: 12px;
 }
 
+/* ── Follow-us-on-X modal ── */
+.follow-us-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-lg);
+  width: 380px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.follow-us-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.follow-us-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+
+.follow-us-x-icon {
+  color: var(--accent-text);
+}
+
+.follow-us-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.follow-us-footer {
+  justify-content: space-between;
+}
+
+.follow-us-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .models-search {
   display: flex;
   align-items: center;
@@ -10637,6 +10856,14 @@ body {
 ::selection {
   background: var(--selection);
   color: var(--text-primary);
+}
+
+/* User bubbles have a blue background (#003f7a default) — the theme's
+   --selection color is also blue-toned and composites to nearly the same
+   shade on top of the user bubble.  Use a brighter sky-blue so the
+   selection highlight remains clearly visible on user messages. */
+.chat-bubble-user ::selection {
+  background: rgba(120, 190, 255, 0.7);
 }
 
 /* ========================================================================
@@ -11615,4 +11842,134 @@ body {
 .council-reset {
   align-self: flex-start;
   color: var(--text-muted);
+}
+
+/* ========================================================================
+   WEB PREVIEW PANEL
+   ======================================================================== */
+.web-preview-panel {
+  width: 480px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Drag handle on the left edge to free-resize the panel width. */
+.web-preview-resize-handle {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background var(--transition);
+}
+
+.web-preview-resize-handle:hover,
+.web-preview-resize-handle-active {
+  background: color-mix(in srgb, var(--accent-text) 45%, transparent);
+}
+
+.web-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.web-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.web-preview-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.web-preview-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.web-preview-address-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  margin: 0 4px;
+  min-width: 0;
+  transition: border-color var(--transition);
+}
+
+.web-preview-address-bar:focus-within {
+  border-color: var(--accent);
+}
+
+.web-preview-globe-icon {
+  color: var(--text-muted);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.web-preview-address-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  outline: none;
+}
+
+.web-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.web-preview-webview-container {
+  flex: 1;
+  position: relative;
+  background: #ffffff;
+}
+
+.web-preview-webview-container webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+}
+
+.web-preview-btn-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+.web-preview-btn-active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 25%, transparent) !important;
+  color: var(--accent) !important;
 }

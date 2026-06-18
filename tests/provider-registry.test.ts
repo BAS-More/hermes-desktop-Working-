@@ -58,9 +58,7 @@ describe("provider-registry", () => {
       expect(canonicalProviderBaseUrl("ollama")).toBe(
         "http://localhost:11434/v1",
       );
-      expect(canonicalProviderBaseUrl("vllm")).toBe(
-        "http://localhost:8000/v1",
-      );
+      expect(canonicalProviderBaseUrl("vllm")).toBe("http://localhost:8000/v1");
       expect(canonicalProviderBaseUrl("llamacpp")).toBe(
         "http://localhost:8080/v1",
       );

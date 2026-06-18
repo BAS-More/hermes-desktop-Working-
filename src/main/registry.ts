@@ -23,7 +23,7 @@ export type {
 
 /**
  * The "Discover" marketplace reads its catalog from a public GitHub repo:
- *   https://github.com/fathah/hermes-registry
+ *   https://github.com/hermesonehq/hermes-registry
  *
  * `index.json` is a flat list of entries, each with a `type`
  * (agent|mcp|skill|workflow) and a `path` to its folder in the repo. "Set up"
@@ -494,7 +494,10 @@ async function installAgent(item: RegistryItem): Promise<InstallResult> {
     const entry = m?.entry || "AGENT.md";
     const md = await tryFetchText(`${item.path}/${entry}`);
     if (md && !writeSoul(md, item.id)) {
-      return { success: false, error: "Failed to write agent persona (SOUL.md)" };
+      return {
+        success: false,
+        error: "Failed to write agent persona (SOUL.md)",
+      };
     }
   }
   return { success: true };

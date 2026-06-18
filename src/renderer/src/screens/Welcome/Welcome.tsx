@@ -203,7 +203,9 @@ function Welcome({
         <div className="welcome-remote-card">
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 3 }}>
-              <label className="welcome-remote-label">{t("settings.sshHost")}</label>
+              <label className="welcome-remote-label">
+                {t("settings.sshHost")}
+              </label>
               <input
                 type="text"
                 className="welcome-remote-input"
@@ -214,7 +216,9 @@ function Welcome({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label className="welcome-remote-label">{t("settings.sshPort")}</label>
+              <label className="welcome-remote-label">
+                {t("settings.sshPort")}
+              </label>
               <input
                 type="number"
                 className="welcome-remote-input"
@@ -295,7 +299,9 @@ function Welcome({
           )}
 
           <p className="welcome-remote-hint">
-            {t("settings.sshHintWelcome", { cmd: `${sshUser || "user"}@${sshHost || "host"}` })}
+            {t("settings.sshHintWelcome", {
+              cmd: `${sshUser || "user"}@${sshHost || "host"}`,
+            })}
           </p>
         </div>
 

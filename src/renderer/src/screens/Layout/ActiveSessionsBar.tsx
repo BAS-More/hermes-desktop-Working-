@@ -11,10 +11,12 @@ export interface ProfileAppearance {
 }
 
 /**
- * A slim, always-visible strip of the conversations currently open across all
- * profiles/agents. Lets the user jump between several sessions running at once
- * (background sessions / multi-agent) and watch each stream live. Hidden when
- * only a single, idle conversation exists — there's nothing to switch between.
+ * The window's top strip. Doubles as the title-bar drag region (browser-style):
+ * the strip itself is draggable, while the conversation chips on top of it stay
+ * clickable. When several sessions are open (background sessions / multi-agent)
+ * it shows a chip per session to switch between them and watch each stream live.
+ * With a single idle conversation it renders empty — just a drag area — so no
+ * vertical space is wasted on a dedicated, always-present tab bar.
  */
 export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   runs,
@@ -30,62 +32,64 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   onClose: (runId: string) => void;
   /** Resolve a profile's avatar/colour for its chip. */
   getAppearance?: (profile: string) => ProfileAppearance;
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   const { t } = useI18n();
 
   const anyLoading = runs.some((r) => r.loading);
-  if (runs.length <= 1 && !anyLoading) return null;
+  // Nothing to switch between → leave the strip empty (pure drag area).
+  const showChips = runs.length > 1 || anyLoading;
 
   return (
     <div className="active-sessions-bar" role="tablist">
-      {runs.map((run) => {
-        const active = run.runId === activeRunId;
-        const label = run.title || t("sessions.newConversation");
-        const appearance = getAppearance?.(run.profile);
-        const color = appearance?.color || defaultColorForName(run.profile);
-        return (
-          <div
-            key={run.runId}
-            role="tab"
-            aria-selected={active}
-            className={`active-session-chip ${active ? "active" : ""} ${
-              run.loading ? "loading" : ""
-            }`}
-            onClick={() => onSelect(run.runId)}
-            title={`${run.profile} — ${label}`}
-          >
-            {run.loading ? (
-              <span
-                className="active-session-chip-avatar"
-                style={{ background: color }}
-                aria-label={run.profile}
-              >
-                <Spinner className="active-session-chip-spinner" size={12} />
-              </span>
-            ) : (
-              <ProfileAvatar
-                name={run.profile}
-                color={appearance?.color}
-                avatar={appearance?.avatar}
-                size={18}
-              />
-            )}
-            <span className="active-session-chip-title">{label}</span>
-            <button
-              type="button"
-              className="active-session-chip-close"
-              title={t("sessions.closeTab")}
-              aria-label={t("sessions.closeTab")}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose(run.runId);
-              }}
+      {showChips &&
+        runs.map((run) => {
+          const active = run.runId === activeRunId;
+          const label = run.title || t("sessions.newConversation");
+          const appearance = getAppearance?.(run.profile);
+          const color = appearance?.color || defaultColorForName(run.profile);
+          return (
+            <div
+              key={run.runId}
+              role="tab"
+              aria-selected={active}
+              className={`active-session-chip ${active ? "active" : ""} ${
+                run.loading ? "loading" : ""
+              }`}
+              onClick={() => onSelect(run.runId)}
+              title={`${run.profile} — ${label}`}
             >
-              <X size={12} />
-            </button>
-          </div>
-        );
-      })}
+              {run.loading ? (
+                <span
+                  className="active-session-chip-avatar"
+                  style={{ background: color }}
+                  aria-label={run.profile}
+                >
+                  <Spinner className="active-session-chip-spinner" size={12} />
+                </span>
+              ) : (
+                <ProfileAvatar
+                  name={run.profile}
+                  color={appearance?.color}
+                  avatar={appearance?.avatar}
+                  size={18}
+                />
+              )}
+              <span className="active-session-chip-title">{label}</span>
+              <button
+                type="button"
+                className="active-session-chip-close"
+                title={t("sessions.closeTab")}
+                aria-label={t("sessions.closeTab")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose(run.runId);
+                }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
     </div>
   );
 });
