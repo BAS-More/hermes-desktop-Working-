@@ -62,7 +62,24 @@ export function resolveShell(): string {
  * its callers in the gateway-lifecycle path; the blast radius exceeded the
  * benefit for an opt-in provider. See WORKFLOW.md / the secrets-provider review.
  */
-const COMMAND_TIMEOUT_MS = 3_000;
+/**
+ * Hard cap (ms) for the helper. Defaults to 3s in production — kept TIGHT
+ * because resolution runs synchronously on the Electron main process, so this
+ * doubles as the worst-case UI-freeze ceiling. Read at CALL time (not module
+ * load) so tests can override it.
+ *
+ * Overridable via `HERMES_SECRET_COMMAND_TIMEOUT_MS` for TESTS ONLY: the spawn
+ * tests exercise a REAL `sh` process, and under a CPU-saturated parallel run
+ * even a trivial `printf` can take >3s just to spawn, tripping the timeout and
+ * yielding a spurious null (flaky failures unrelated to the code). Production
+ * never sets the var and keeps 3s. Parsed defensively: missing/blank/non-numeric
+ * falls back to 3s.
+ */
+export function resolveCommandTimeoutMs(): number {
+  const raw = process.env.HERMES_SECRET_COMMAND_TIMEOUT_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3_000;
+}
 /** Defensive cap on helper output (1 MiB) — a misbehaving command can't OOM us. */
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 
@@ -203,7 +220,7 @@ export function helperExecOptions(
   return {
     // Key passed as DATA via env — never interpolated into the command.
     env: { ...process.env, HERMES_SECRET_KEY: secretKey },
-    timeout: COMMAND_TIMEOUT_MS,
+    timeout: resolveCommandTimeoutMs(),
     maxBuffer: MAX_OUTPUT_BYTES,
     encoding: "utf-8",
     // F6: execFileSync's default stdio inherits stderr, streaming the helper's
