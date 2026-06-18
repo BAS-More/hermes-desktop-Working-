@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Trash, ChatBubble, Pencil, X } from "../../assets/icons";
+import { Plus, Trash, ChatBubble, Pencil, X, Settings } from "../../assets/icons";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
 import { PROFILE_COLORS } from "../../../../shared/profileColors";
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../../components/useI18n";
+import AgentDetail, { type AgentDetailTab } from "./AgentDetail";
 
 interface ProfileInfo {
   name: string;
@@ -24,12 +25,14 @@ interface AgentsProps {
   activeProfile: string;
   onSelectProfile: (name: string) => void;
   onChatWith: (name: string) => void;
+  onBrowseSkills?: () => void;
 }
 
 function Agents({
   activeProfile,
   onSelectProfile,
   onChatWith,
+  onBrowseSkills,
 }: AgentsProps): React.JSX.Element {
   const { t } = useI18n();
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -42,6 +45,11 @@ function Agents({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // Name of the profile whose appearance modal is open (null = closed).
   const [editingName, setEditingName] = useState<string | null>(null);
+  // Profile whose per-agent config (persona/skills/tools) panel is open.
+  const [configuring, setConfiguring] = useState<{
+    name: string;
+    tab: AgentDetailTab;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Live view of the profile being edited, so the modal reflects updates.
@@ -267,7 +275,17 @@ function Agents({
               {p.model ? p.model.split("/").pop() : t("agents.noModel")}
             </div>
             <div className="agents-card-stats">
-              <span>{t("agents.skillsCount", { count: p.skillCount })}</span>
+              <button
+                type="button"
+                className="agents-card-skills-link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfiguring({ name: p.name, tab: "skills" });
+                }}
+                title={t("agents.configure")}
+              >
+                {t("agents.skillsCount", { count: p.skillCount })}
+              </button>
               <span className="agents-card-dot" />
               {p.gatewayRunning ? (
                 <span className="agents-card-gateway-on">
@@ -278,6 +296,17 @@ function Agents({
               )}
             </div>
             <div className="agents-card-footer">
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfiguring({ name: p.name, tab: "persona" });
+                }}
+                title={t("agents.configure")}
+              >
+                <Settings size={13} />
+                {t("agents.configure")}
+              </button>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={(e) => {
@@ -292,6 +321,20 @@ function Agents({
           </div>
         ))}
       </div>
+
+      {configuring && (
+        <AgentDetail
+          profile={configuring.name}
+          color={profiles.find((p) => p.name === configuring.name)?.color}
+          avatar={profiles.find((p) => p.name === configuring.name)?.avatar}
+          initialTab={configuring.tab}
+          onBrowseSkills={onBrowseSkills}
+          onClose={() => {
+            setConfiguring(null);
+            loadProfiles();
+          }}
+        />
+      )}
 
       {editingProfile && (
         <div
