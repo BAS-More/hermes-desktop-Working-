@@ -172,6 +172,7 @@ export interface SearchResult {
   sessionId: string;
   title: string | null;
   startedAt: number;
+  lastActivity: number;
   source: string;
   messageCount: number;
   model: string;
@@ -381,6 +382,11 @@ export function searchSessions(query: string, limit = 20): SearchResult[] {
       sessionId: r.session_id,
       title: r.title,
       startedAt: r.started_at,
+      // No per-session last-activity column is selected by these queries, so
+      // fall back to started_at — callers use lastActivity only for ordering/
+      // display and the rows are already ordered by recency. Keeps the value a
+      // real number (satisfies SearchResult) without a schema/query change.
+      lastActivity: r.started_at,
       source: r.source,
       messageCount: r.message_count,
       model: r.model || "",
@@ -732,6 +738,13 @@ export interface AggregatedSession {
   profile: string;
   title: string | null;
   startedAt: number;
+  /**
+   * Timestamp of the most recent message in the session (epoch seconds),
+   * falling back to `startedAt` for sessions that have no messages yet. This
+   * — not `startedAt` — is what the UI sorts and date-groups by, so a fresh
+   * reply on an old conversation floats it back to the top.
+   */
+  lastActivity: number;
   source: string;
   messageCount: number;
   model: string;
@@ -867,9 +880,14 @@ export function listAllSessions(limit = 200): AggregatedSession[] {
       const rows = db
         .prepare(
           `SELECT s.id, s.source, s.started_at, s.message_count, s.model, s.title
-             ${archived ? ", s.archived" : ""}
+             ${archived ? ", s.archived" : ""},
+             (SELECT MAX(m.timestamp) FROM messages m WHERE m.session_id = s.id)
+               AS last_activity
            FROM sessions s
-           ORDER BY s.started_at DESC
+           ORDER BY COALESCE(
+             (SELECT MAX(m.timestamp) FROM messages m WHERE m.session_id = s.id),
+             s.started_at
+           ) DESC
            LIMIT ?`,
         )
         .all(limit) as Array<{
@@ -880,6 +898,7 @@ export function listAllSessions(limit = 200): AggregatedSession[] {
         model: string;
         title: string | null;
         archived?: number;
+        last_activity: number | null;
       }>;
       const meta = readAllMeta(db);
       for (const r of rows) {
@@ -889,6 +908,7 @@ export function listAllSessions(limit = 200): AggregatedSession[] {
           profile,
           title: r.title,
           startedAt: r.started_at,
+          lastActivity: r.last_activity ?? r.started_at,
           source: r.source,
           messageCount: r.message_count,
           model: r.model || "",
@@ -904,7 +924,7 @@ export function listAllSessions(limit = 200): AggregatedSession[] {
       db?.close();
     }
   }
-  all.sort((a, b) => b.startedAt - a.startedAt);
+  all.sort((a, b) => b.lastActivity - a.lastActivity);
   return all.slice(0, limit);
 }
 
@@ -931,6 +951,7 @@ export function searchAllSessions(
           profile,
           title: r.title,
           startedAt: r.startedAt,
+          lastActivity: r.lastActivity,
           source: r.source,
           messageCount: r.messageCount,
           model: r.model,
@@ -948,7 +969,7 @@ export function searchAllSessions(
     }
   }
   // Title/FTS matches already ranked per-DB; across DBs sort by recency.
-  all.sort((a, b) => b.startedAt - a.startedAt);
+  all.sort((a, b) => b.lastActivity - a.lastActivity);
   return all.slice(0, limit);
 }
 
@@ -966,7 +987,9 @@ function searchSessionsInDb(
   const titleRows = db
     .prepare(
       `SELECT s.id as session_id, s.title, s.started_at, s.source,
-              s.message_count, s.model ${archived ? ", s.archived" : ""}
+              s.message_count, s.model ${archived ? ", s.archived" : ""},
+              (SELECT MAX(m.timestamp) FROM messages m WHERE m.session_id = s.id)
+                AS last_activity
        FROM sessions s
        WHERE LOWER(COALESCE(s.title, '')) LIKE ? ESCAPE '\\'
          OR LOWER(s.id) LIKE ? ESCAPE '\\'
@@ -985,6 +1008,7 @@ function searchSessionsInDb(
     message_count: number;
     model: string;
     archived?: number;
+    last_activity: number | null;
   }>;
 
   const titleMatches = titleRows.map((r) => ({
@@ -1010,6 +1034,8 @@ function searchSessionsInDb(
         .prepare(
           `SELECT DISTINCT m.session_id, s.title, s.started_at, s.source,
                   s.message_count, s.model ${archived ? ", s.archived" : ""},
+                  (SELECT MAX(m2.timestamp) FROM messages m2
+                     WHERE m2.session_id = s.id) AS last_activity,
                   snippet(messages_fts, 0, '<<', '>>', '...', 40) as snippet
            FROM messages_fts
            JOIN messages m ON m.id = messages_fts.rowid
@@ -1026,6 +1052,7 @@ function searchSessionsInDb(
         message_count: number;
         model: string;
         archived?: number;
+        last_activity: number | null;
         snippet: string;
       }>)
     : [];
@@ -1038,6 +1065,7 @@ function searchSessionsInDb(
     sessionId: r.session_id,
     title: r.title,
     startedAt: r.started_at,
+    lastActivity: r.last_activity ?? r.started_at,
     source: r.source,
     messageCount: r.message_count,
     model: r.model || "",
