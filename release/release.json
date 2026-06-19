@@ -1,0 +1,33 @@
+{
+  "product": "Hermes Desktop + Claude Code Bridge",
+  "version": "0.6.5",
+  "git_commit": "f083b57",
+  "built_at": "2026-06-19T04:46:00",
+  "bundled_features": [
+    "LLM Council (convene button + Models tab)",
+    "Sidebar session context-menu (rename / pin / archive / delete)",
+    "Claude Code Bridge status pill (Settings)",
+    "CSP allowlist fix (http://127.0.0.1:8770)"
+  ],
+  "desktop": {
+    "install_dir": "%LOCALAPPDATA%\\Programs\\hermes-desktop",
+    "pair": {
+      "exe": "hermes-agent.exe",
+      "asar": "resources/app.asar",
+      "note": "exe and asar are integrity-bound; they MUST be swapped together."
+    },
+    "staged_sha256_prefix": {
+      "app.asar.new": "53d0051ce8219e11",
+      "hermes-agent.exe.new": "f8dd430aadd5201d"
+    }
+  },
+  "bridge": {
+    "dir": "C:\\Dev\\tools\\hermes-cc-bridge",
+    "server": "hermes_cc_bridge_server.py",
+    "url": "http://127.0.0.1:8770",
+    "autostart_vbs": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\hermes-cc-bridge-autostart.vbs",
+    "cron": "every 6h (CC->Hermes bridge sync)",
+    "coupling": "separate, non-blocking: a bridge failure must NOT block the desktop swap"
+  },
+  "lifecycle_policy": "ONE script per lifecycle (update / undo), NEVER per feature."
+}
