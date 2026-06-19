@@ -204,9 +204,15 @@ describe("CommandSecretsProvider", () => {
 
   beforeEach(() => {
     mockedGetConfigValue.mockReset();
+    // Generous budget so the REAL `sh` spawn doesn't trip the production 3s
+    // timeout under CPU-saturated parallel runs (flaky null). Production never
+    // sets this var — see resolveCommandTimeoutMs(). Timeout-bound tests below
+    // pin a tight value locally.
+    process.env.HERMES_CMD_HELPER_TIMEOUT_MS = "30000";
   });
   afterEach(() => {
     delete process.env.HERMES_TEST_MARKER;
+    delete process.env.HERMES_CMD_HELPER_TIMEOUT_MS;
   });
 
   it("returns null when no command is configured", () => {
@@ -280,7 +286,9 @@ describe("CommandSecretsProvider", () => {
     // synchronously on the Electron main process, so the helper timeout doubles
     // as the worst-case UI-freeze ceiling. A helper that blocks past the bound
     // MUST be killed and resolve to null — and do so WELL under the old 10s cap.
-    // If COMMAND_TIMEOUT_MS is bumped back up (or the cap removed), this fails.
+    // Pin a tight bound locally (beforeEach set a generous suite budget);
+    // this test proves the kill fires fast.
+    process.env.HERMES_CMD_HELPER_TIMEOUT_MS = "1500";
     mockedGetConfigValue.mockReturnValue("sleep 30");
     const started = Date.now();
     const out = provider.get("SLOW_KEY");
@@ -291,6 +299,7 @@ describe("CommandSecretsProvider", () => {
   });
 
   it("list() also enforces the timeout bound on a slow helper", () => {
+    process.env.HERMES_CMD_HELPER_TIMEOUT_MS = "1500";
     mockedGetConfigValue.mockReturnValue("sleep 30");
     const started = Date.now();
     const out = provider.list();
