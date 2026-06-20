@@ -132,6 +132,14 @@ const hermesAPI = {
 
   quitApp: (): Promise<void> => ipcRenderer.invoke("quit-app"),
 
+  // Git worktree-per-session (A1)
+  worktreeCreate: (sessionId: string, repoPath: string) =>
+    ipcRenderer.invoke("worktree-create", sessionId, repoPath),
+  worktreeRemove: (sessionId: string, repoPath: string) =>
+    ipcRenderer.invoke("worktree-remove", sessionId, repoPath),
+  worktreeList: (repoPath: string) =>
+    ipcRenderer.invoke("worktree-list", repoPath),
+
   onInstallProgress: (
     callback: (progress: {
       step: number;
