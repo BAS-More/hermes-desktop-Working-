@@ -576,7 +576,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             {onCouncil && (
               <button
                 type="button"
-                className="chat-council-btn"
+                className={`chat-council-btn${input.trim() ? " chat-council-btn--active" : ""}`}
                 onClick={handleCouncil}
                 disabled={isLoading}
                 title={t("chat.councilTitle")}

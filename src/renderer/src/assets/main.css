@@ -3802,6 +3802,17 @@ body {
   border-color: var(--accent);
 }
 
+.chat-council-btn--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.chat-council-btn--active:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
 .chat-council-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
