@@ -80,6 +80,7 @@ const SidebarSessionMenu = memo(function SidebarSessionMenu({
   onMoveToGroup,
   onArchiveToggle,
   onDelete,
+  onOpenWorktree,
 }: {
   session: RecentSession;
   groups: SessionGroupInfo[];
@@ -92,6 +93,7 @@ const SidebarSessionMenu = memo(function SidebarSessionMenu({
   onMoveToGroup: (groupId: string | null) => void;
   onArchiveToggle: () => void;
   onDelete: () => void;
+  onOpenWorktree?: () => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -213,6 +215,11 @@ const SidebarSessionMenu = memo(function SidebarSessionMenu({
       ? t("sessions.actions.unarchive")
       : t("sessions.actions.archive"),
     run: onArchiveToggle,
+  });
+  items.push({
+    key: "worktree",
+    label: "🌿 Open in Worktree",
+    run: onOpenWorktree ?? (() => {}),
   });
   items.push({
     key: "delete",
@@ -651,6 +658,22 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
     });
   }, []);
 
+  const handleOpenWorktree = useCallback((s: RecentSession): void => {
+    // Ask the user for the repo path via a dialog, then create the worktree.
+    // We use window.hermesAPI.getHermesHome() as a sensible default root.
+    void (async () => {
+      const home = await window.hermesAPI.getHermesHome(s.profile);
+      const result = await window.hermesAPI.worktreeCreate(s.id, home);
+      if (result.ok) {
+        // Open the worktree directory in the OS file manager.
+        void window.open(`file://${result.record.worktreePath}`);
+      } else {
+        // eslint-disable-next-line no-console
+        console.error("[worktree] create failed:", result.error);
+      }
+    })();
+  }, []);
+
   // Rename (inline)
   const startRename = useCallback((s: RecentSession): void => {
     setRenamingId(s.id);
@@ -804,6 +827,7 @@ const SidebarRecentSessions = memo(function SidebarRecentSessions({
                   onMoveToGroup={(gid) => handleMoveToGroup(s, gid)}
                   onArchiveToggle={() => handleArchiveToggle(s)}
                   onDelete={() => setPendingDelete(s)}
+                  onOpenWorktree={() => handleOpenWorktree(s)}
                 />
               )}
 

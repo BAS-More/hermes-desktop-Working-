@@ -734,6 +734,20 @@ function setupIPC(): void {
   });
   ipcMain.handle("quit-app", () => app.quit());
 
+  // ── Git worktree-per-session (A1) ─────────────────────────────────────────
+  ipcMain.handle("worktree-create", async (_e, sessionId: string, repoPath: string) => {
+    const { createWorktree } = await import("./worktree");
+    return createWorktree(sessionId, repoPath);
+  });
+  ipcMain.handle("worktree-remove", async (_e, sessionId: string, repoPath: string) => {
+    const { removeWorktree } = await import("./worktree");
+    return removeWorktree(sessionId, repoPath);
+  });
+  ipcMain.handle("worktree-list", async (_e, repoPath: string) => {
+    const { listWorktrees } = await import("./worktree");
+    return listWorktrees(repoPath);
+  });
+
   // Hermes engine info
   ipcMain.handle("get-hermes-version", async () => {
     const conn = getConnectionConfig();

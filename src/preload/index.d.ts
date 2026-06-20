@@ -321,6 +321,12 @@ interface HermesAPI {
   validateHermesHome: (dir: string) => Promise<boolean>;
   adoptHermesHome: (dir: string) => Promise<boolean>;
   quitApp: () => Promise<void>;
+
+  // Git worktree-per-session (A1)
+  worktreeCreate: (sessionId: string, repoPath: string) => Promise<{ ok: true; record: { sessionId: string; repoPath: string; worktreePath: string; branch: string; createdAt: string } } | { ok: false; error: string }>;
+  worktreeRemove: (sessionId: string, repoPath: string) => Promise<{ ok: boolean; error?: string }>;
+  worktreeList: (repoPath: string) => Promise<Array<{ sessionId: string; repoPath: string; worktreePath: string; branch: string; createdAt: string }>>;
+
   onInstallProgress: (
     callback: (progress: InstallProgress) => void,
   ) => () => void;
