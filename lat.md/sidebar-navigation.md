@@ -18,7 +18,7 @@ The native sidebar scrollbar is hidden to avoid layout shifts. [[src/renderer/sr
 
 Workspace-linked conversations are grouped under project rows so repository chats stay together without hiding ordinary chats.
 
-[[src/main/session-cache.ts#syncSessionCache]] and [[src/main/session-cache.ts#listCachedSessions]] attach the session context folder from [[src/main/session-context-folder-store.ts#getSessionContextFolder]] to cached-session rows. The sidebar groups rows with a `contextFolder` under a Projects section by folder basename, while rows without one remain under Chats.
+[[src/main/session-cache.ts#syncSessionCache]] attaches each row's context folder in one batched [[src/main/session-context-folder-store.ts#getSessionContextFolders]] read and persists `contextFolder` into the `sessions.json` cache. [[src/main/session-cache.ts#listCachedSessions]] stays a DB-free cache read — it returns the persisted `contextFolder` without re-querying the store. The sidebar groups rows with a `contextFolder` under a Projects section by folder basename, while rows without one remain under Chats.
 
 When [[src/renderer/src/screens/Chat/Chat.tsx#Chat]] saves a session context folder, it emits a renderer event that [[src/renderer/src/screens/Layout/SidebarRecentSessions.tsx]] uses to force-refresh the cache. This keeps project grouping visible immediately after a workspace is linked.
 

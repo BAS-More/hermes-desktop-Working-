@@ -10,7 +10,7 @@ import Database from "better-sqlite3";
 import { t } from "../shared/i18n";
 import { getAppLocale } from "./locale";
 import { getDbConnection } from "./db";
-import { getSessionContextFolder } from "./session-context-folder-store";
+import { getSessionContextFolders } from "./session-context-folder-store";
 
 /**
  * The session cache lives alongside its own profile's data so profiles
@@ -104,10 +104,15 @@ function getDb(): Database.Database | null {
   return getDbConnection(true);
 }
 
+// Attach each session's linked folder in a single batched store read, so a
+// full sync stays a couple of queries rather than two per row. The result is
+// written into the JSON cache by `syncSessionCache`, which lets the renderer's
+// fast read path (`listCachedSessions`) stay DB-free.
 function attachContextFolders(sessions: CachedSession[]): CachedSession[] {
+  const folders = getSessionContextFolders(sessions.map((s) => s.id));
   return sessions.map((session) => ({
     ...session,
-    contextFolder: getSessionContextFolder(session.id),
+    contextFolder: folders.get(session.id) ?? null,
   }));
 }
 
@@ -181,7 +186,9 @@ export function syncSessionCache(): CachedSession[] {
         source: row.source,
         messageCount: row.message_count,
         model: row.model || "",
-        contextFolder: getSessionContextFolder(row.id),
+        // Filled in below by the single batched `attachContextFolders` pass
+        // over the merged set, so we don't query the store once per new row.
+        contextFolder: null,
       });
     }
 
@@ -242,10 +249,13 @@ export function syncSessionCache(): CachedSession[] {
   }
 }
 
-// Fast read from cache only (no DB access)
+// Fast read from cache only (no DB access). `contextFolder` is persisted into
+// the cache by `syncSessionCache`, and folder changes trigger a re-sync (the
+// renderer fires `hermes-session-context-folder-changed`), so the cached value
+// stays current without this path touching the DB.
 export function listCachedSessions(limit = 50, offset = 0): CachedSession[] {
   const cache = readCache();
-  return attachContextFolders(cache.sessions.slice(offset, offset + limit));
+  return cache.sessions.slice(offset, offset + limit);
 }
 
 // Update title for a specific session
