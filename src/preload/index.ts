@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
 import type { Attachment } from "../shared/attachments";
+import type { SessionModelOverride } from "../shared/model-override";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
 import type { DesktopSessionLocalError } from "../shared/session-continuation";
 import type {
@@ -72,7 +73,6 @@ interface SessionGroupInfo {
   createdAt: number;
   profile: string;
 }
-
 interface DashboardConnection {
   baseUrl: string;
   wsUrl: string;
@@ -474,7 +474,7 @@ const hermesAPI = {
     attachments?: Attachment[],
     contextFolder?: string,
     runId?: string,
-    modelOverride?: string,
+    modelOverride?: SessionModelOverride,
   ): Promise<{ response: string; sessionId?: string }> =>
     ipcRenderer.invoke(
       "send-message",
@@ -824,6 +824,27 @@ const hermesAPI = {
   ): Promise<boolean> =>
     ipcRenderer.invoke("record-session-local-error", sessionId, error),
 
+
+  getSessionContextFolder: (sessionId: string): Promise<string | null> =>
+    ipcRenderer.invoke("get-session-context-folder", sessionId),
+
+  setSessionContextFolder: (
+    sessionId: string,
+    folder: string | null,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-session-context-folder", sessionId, folder),
+
+  getSessionModelOverride: (
+    sessionId: string,
+  ): Promise<SessionModelOverride | null> =>
+    ipcRenderer.invoke("get-session-model-override", sessionId),
+
+  setSessionModelOverride: (
+    sessionId: string,
+    override: SessionModelOverride | null,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-session-model-override", sessionId, override),
+
   // Profiles
   listProfiles: (): Promise<
     Array<{
@@ -962,6 +983,7 @@ const hermesAPI = {
       source: string;
       messageCount: number;
       model: string;
+      contextFolder: string | null;
     }>
   > => ipcRenderer.invoke("list-cached-sessions", limit, offset),
 
@@ -973,6 +995,7 @@ const hermesAPI = {
       source: string;
       messageCount: number;
       model: string;
+      contextFolder: string | null;
     }>
   > => ipcRenderer.invoke("sync-session-cache"),
 
@@ -1235,6 +1258,10 @@ const hermesAPI = {
   downloadUpdate: (): Promise<boolean> => ipcRenderer.invoke("download-update"),
   installUpdate: (): Promise<void> => ipcRenderer.invoke("install-update"),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke("get-app-version"),
+  getAutoUpgradeEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke("get-auto-upgrade-enabled"),
+  setAutoUpgradeEnabled: (enabled: boolean): Promise<boolean> =>
+    ipcRenderer.invoke("set-auto-upgrade-enabled", enabled),
 
   onUpdateAvailable: (
     callback: (info: { version: string; releaseNotes: string }) => void,
@@ -1422,6 +1449,10 @@ const hermesAPI = {
     ipcRenderer.invoke("kanban-unblock-task", taskId, profile),
   kanbanArchiveTask: (taskId: string, profile?: string) =>
     ipcRenderer.invoke("kanban-archive-task", taskId, profile),
+  kanbanPromoteTask: (taskId: string, profile?: string) =>
+    ipcRenderer.invoke("kanban-promote-task", taskId, profile),
+  kanbanScheduleTask: (taskId: string, reason?: string, profile?: string) =>
+    ipcRenderer.invoke("kanban-schedule-task", taskId, reason, profile),
   kanbanSpecifyTask: (taskId: string, profile?: string) =>
     ipcRenderer.invoke("kanban-specify-task", taskId, profile),
   kanbanReclaimTask: (taskId: string, reason?: string, profile?: string) =>

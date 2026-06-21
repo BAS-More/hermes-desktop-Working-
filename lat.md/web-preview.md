@@ -14,6 +14,8 @@ The preview is the only webview allowed to load remote HTTPS; all others stay re
 
 - **Attach gate** — [[src/main/index.ts]]'s `will-attach-webview` handler reads `params.partition === "web-preview"` (attributes are forwarded as a `Record<string, string>`) and, when true, calls `isAllowedWebviewUrl(src, true)`.
 - **Navigation gate** — in `web-contents-created`, [[src/main/index.ts]] compares the new webview's `session` against `session.fromPartition("web-preview")` (a singleton per partition) and passes the resulting `isWebPreview` boolean into [[src/main/security.ts#hardenAttachedWebContents]], which applies the `allowHttps` flag to `will-navigate` / `will-redirect`.
+- **Attach gate** — [[src/main/app/start.ts#startMainProcess]]'s `will-attach-webview` handler reads `params.partition === "web-preview"` (attributes are forwarded as a `Record<string, string>`) and, when true, calls `isAllowedWebviewUrl(src, true)`.
+- **Navigation gate** — in `web-contents-created`, [[src/main/app/start.ts#startMainProcess]] calls [[src/main/security.ts#hardenAttachedWebContents]], which applies the `allowHttps` flag to web-preview navigations.
 
 The session comparison is deliberate: `getLastWebPreferences()` is not a public Electron API (returns `undefined`), so reading attributes back from the attached webContents is unreliable — the partition session is the only signal available in `web-contents-created`. Without it, redirects (e.g. `google.com` → `www.google.com`) and subsequent navigations are wrongly blocked even though the initial attach succeeded.
 
