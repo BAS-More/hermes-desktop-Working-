@@ -716,6 +716,20 @@ export function getModelConfig(profile?: string): {
     baseUrl: children.get("base_url")?.value || defaults.baseUrl,
   };
 
+  // Round-trip: 9Router is persisted to the engine as `custom` + the
+  // canonical 9Router base_url (the engine's resolve_provider rejects
+  // unknown names). Present it back to the UI as `9router` so the user's
+  // original selection survives a reload. Mirror of the forward translation
+  // in setModelConfig.
+  const nineRouterBase = canonicalProviderBaseUrl("9router") || "";
+  if (
+    result.provider === "custom" &&
+    nineRouterBase &&
+    result.baseUrl.replace(/\/+$/, "") === nineRouterBase.replace(/\/+$/, "")
+  ) {
+    result.provider = "9router";
+  }
+
   setCache(cacheKey, result);
   return result;
 }
@@ -956,7 +970,14 @@ export function setModelConfig(
   // from an empty starting string.
   let content = existsSync(configFile) ? readFileSync(configFile, "utf-8") : "";
 
-  content = upsertBlockChild(content, "model", "provider", provider);
+  // 9Router is a first-class provider in the UI, but the engine's
+  // resolve_provider rejects unknown names. Persist it as `custom`; the
+  // canonical 9Router base_url (written below via canonicalProviderBaseUrl
+  // on the original `provider`) is what the engine routes on, and
+  // getModelConfig round-trips `custom` + that base_url back to "9router".
+  const engineProvider = provider === "9router" ? "custom" : provider;
+
+  content = upsertBlockChild(content, "model", "provider", engineProvider);
   content = upsertBlockChild(content, "model", "default", model);
 
   // Pick the effective base_url to write.  Precedence:

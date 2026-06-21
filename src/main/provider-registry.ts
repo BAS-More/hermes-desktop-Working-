@@ -34,6 +34,11 @@ export const PROVIDER_BASE_URLS: Record<string, string> = {
   ollama: "http://localhost:11434/v1",
   vllm: "http://localhost:8000/v1",
   llamacpp: "http://localhost:8080/v1",
+  // Local 9Router gateway (OpenAI-compatible). Presented as a first-class
+  // provider in the UI; persisted to the engine as `custom` + this base_url
+  // (the engine's resolve_provider rejects unknown names) and round-tripped
+  // back to "9router" on load. See config.ts setModelConfig/getModelConfig.
+  "9router": "http://127.0.0.1:20128/v1",
 };
 
 /**
