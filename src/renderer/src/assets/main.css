@@ -1725,6 +1725,31 @@ body {
   display: none;
 }
 
+/* New-session "+" button — sits left of the chips in the drag strip. */
+.active-sessions-new-btn {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: auto 4px auto 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.active-sessions-new-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 /* Flat tab: no border or fill, just text. Adjacent tabs are separated by a thin
    vertical divider (::before); the active tab fills with the page colour and
    rounds its top so it looks docked to the content beneath. */

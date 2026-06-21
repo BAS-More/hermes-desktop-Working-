@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Spinner, X } from "../../assets/icons";
+import { Spinner, X, Plus } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
 import { defaultColorForName } from "../../../../shared/profileColors";
@@ -23,6 +23,7 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   activeRunId,
   onSelect,
   onClose,
+  onNewChat,
   getAppearance,
 }: {
   runs: ChatRun[];
@@ -30,6 +31,8 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   onSelect: (runId: string) => void;
   /** Close (and stop, if running) a conversation tab. */
   onClose: (runId: string) => void;
+  /** Open a new blank conversation. */
+  onNewChat?: () => void;
   /** Resolve a profile's avatar/colour for its chip. */
   getAppearance?: (profile: string) => ProfileAppearance;
 }): React.JSX.Element {
@@ -41,6 +44,17 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
 
   return (
     <div className="active-sessions-bar" role="tablist">
+      {onNewChat && (
+        <button
+          type="button"
+          className="active-sessions-new-btn"
+          onClick={onNewChat}
+          title={t("sessions.newConversation")}
+          aria-label={t("sessions.newConversation")}
+        >
+          <Plus size={14} />
+        </button>
+      )}
       {showChips &&
         runs.map((run) => {
           const active = run.runId === activeRunId;
