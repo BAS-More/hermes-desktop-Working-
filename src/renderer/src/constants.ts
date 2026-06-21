@@ -54,6 +54,9 @@ export const PROVIDERS = {
     { value: "ollama", label: "constants.ollama" },
     { value: "vllm", label: "constants.vllm" },
     { value: "llamacpp", label: "constants.llamacpp" },
+    // Local 9Router gateway (OpenAI-compatible, no key). Persisted to the
+    // engine as `custom` + base_url; see config.ts round-trip.
+    { value: "9router", label: "9Router (local)" },
     // Subscription / OAuth plans
     // openai-codex is listed once above (first-party group) via #102 —
     // not repeated here to avoid a duplicate <option> value.
@@ -94,6 +97,7 @@ export const PROVIDERS = {
     ollama: "constants.ollama",
     vllm: "constants.vllm",
     llamacpp: "constants.llamacpp",
+    "9router": "9Router (local)",
     "xai-oauth": "xAI Grok (OAuth)",
     "qwen-oauth": "Qwen (OAuth)",
     "google-gemini-cli": "Gemini (CLI OAuth)",
@@ -238,6 +242,23 @@ export const PROVIDERS = {
       placeholder: "sk-...",
       configProvider: "custom",
       baseUrl: "http://localhost:1234/v1",
+      needsKey: false,
+    },
+    // Local 9Router gateway — OpenAI-compatible router for Anthropic-shape
+    // (cc/, ag/) + OpenAI-shape (cx/) backends + combos (cc-opus-failover,
+    // etc.). No API key required. Persisted as `custom` engine-side via the
+    // round-trip in config.ts; the dashboard URL is for users to see live
+    // routing decisions and account state.
+    {
+      id: "9router",
+      name: "9Router (local)",
+      desc: "Local router for Anthropic, OpenAI & Gemini backends",
+      tag: "constants.localTag",
+      envKey: "",
+      url: "http://127.0.0.1:20128/dashboard",
+      placeholder: "",
+      configProvider: "9router",
+      baseUrl: "http://127.0.0.1:20128/v1",
       needsKey: false,
     },
   ],

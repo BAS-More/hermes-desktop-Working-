@@ -330,6 +330,9 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   nous: "NOUS_API_KEY",
   "nous-api": "NOUS_API_KEY",
   xiaomi: "XIAOMI_API_KEY",
+  // NOTE: "9router" is intentionally absent. It's a local no-key gateway;
+  // a null env-key result tells the install gate / pre-send validation that
+  // no API key is required (see PROVIDERS_WITHOUT_API_KEYS in providers.ts).
 };
 
 // When provider is "custom" or "auto", the desktop's setup flow falls

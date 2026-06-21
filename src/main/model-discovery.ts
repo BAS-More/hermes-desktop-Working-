@@ -260,6 +260,8 @@ const LOCAL_NO_KEY_PROVIDERS = new Set([
   "ollama",
   "vllm",
   "llamacpp",
+  // Local 9Router gateway — /v1/models is reachable without auth.
+  "9router",
 ]);
 
 function cacheKey(provider: string, baseUrl: string): string {

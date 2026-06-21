@@ -5,6 +5,8 @@ export const PROVIDERS_WITHOUT_API_KEYS = new Set([
   "vllm",
   "llamacpp",
   "openai-codex",
+  // Local 9Router gateway — accepts requests with no Authorization header.
+  "9router",
 ]);
 
 export function providerDoesNotNeedApiKey(provider: string): boolean {
