@@ -22,11 +22,9 @@ import {
   Sparkles,
   Check,
   ExternalLink,
-  CouncilIcon,
 } from "../../assets/icons";
 import { LOCAL_PRESETS, PROVIDERS } from "../../constants";
 import { useI18n } from "../../components/useI18n";
-import { CouncilTab } from "./CouncilTab";
 import BrandLogo from "../../components/common/BrandLogo";
 import { detectProviderFromUrl } from "./detect-provider";
 import { useDiscoveredModels } from "../../hooks/useDiscoveredModels";
@@ -75,13 +73,24 @@ export function modelConfigBaseUrlForProvider(
     : "";
 }
 
+export type ModelsTab = "models" | "auxiliary";
+
 interface ModelsProps {
   visible?: boolean;
+  activeTab?: ModelsTab;
+  showTabs?: boolean;
+  embedded?: boolean;
 }
 
-function Models({ visible }: ModelsProps = {}): React.JSX.Element {
+function Models({
+  visible,
+  activeTab: controlledActiveTab,
+  showTabs = true,
+  embedded = false,
+}: ModelsProps = {}): React.JSX.Element {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<"models" | "auxiliary" | "council">("models");
+  const [localActiveTab, setLocalActiveTab] = useState<ModelsTab>("models");
+  const activeTab = controlledActiveTab ?? localActiveTab;
   const [models, setModels] = useState<SavedModel[]>([]);
   const [search, setSearch] = useState("");
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
@@ -519,8 +528,8 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
 
   if (loading) {
     return (
-      <div className="settings-container">
-        <h1 className="settings-header">{t("models.title")}</h1>
+      <div className={embedded ? "models-embedded" : "settings-container"}>
+        {!embedded && <h1 className="settings-header">{t("models.title")}</h1>}
         <div className="models-loading">
           <div className="loading-spinner" />
         </div>
@@ -529,79 +538,76 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
   }
 
   return (
-    <div className="settings-container">
-      <div className="models-header">
-        <div>
-          <h1 className="settings-header models-title-tight">
-            {t("models.title")}
-          </h1>
-          <p className="models-subtitle">{t("models.subtitle")}</p>
-        </div>
-        {activeTab === "models" && (
-          <div className="models-header-actions">
-            <a
-              href="https://github.com/hermesonehq/hermes-registry"
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-secondary btn-sm"
-              title="Open Registry on GitHub"
-            >
-              <ExternalLink size={14} />
-              Open Registry
-            </a>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => openRegistry()}
-            >
-              <Sparkles size={14} />
-              {t("models.browseRegistry")}
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={openAddModal}>
-              <Plus size={14} />
-              {t("models.addModel")}
-            </button>
+    <div className={embedded ? "models-embedded" : "settings-container"}>
+      {!embedded && (
+        <div className="models-header">
+          <div>
+            <h1 className="settings-header models-title-tight">
+              {t("models.title")}
+            </h1>
+            <p className="models-subtitle">{t("models.subtitle")}</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="models-tabs">
-        <button
-          className={`models-tab ${activeTab === "models" ? "active" : ""}`}
-          onClick={() => setActiveTab("models")}
-        >
-          <Bot size={16} />
-          {t("models.title")}
-        </button>
-        <button
-          className={`models-tab ${activeTab === "auxiliary" ? "active" : ""}`}
-          onClick={() => setActiveTab("auxiliary")}
-        >
-          <Wrench size={16} />
-          {t("constants.auxiliaryTitle")}
-        </button>
-        <button
-          className={`models-tab ${activeTab === "council" ? "active" : ""}`}
-          onClick={() => setActiveTab("council")}
-        >
-          <CouncilIcon size={16} />
-          {t("council.tabTitle")}
-        </button>
-      </div>
+      {showTabs && (
+        <div className="models-tabs">
+          <button
+            className={`models-tab ${activeTab === "models" ? "active" : ""}`}
+            onClick={() => setLocalActiveTab("models")}
+          >
+            <Bot size={16} />
+            {t("models.title")}
+          </button>
+          <button
+            className={`models-tab ${activeTab === "auxiliary" ? "active" : ""}`}
+            onClick={() => setLocalActiveTab("auxiliary")}
+          >
+            <Wrench size={16} />
+            {t("constants.auxiliaryTitle")}
+          </button>
+        </div>
+      )}
 
       {activeTab === "models" && (
         <>
-          {models.length > 0 && (
-            <div className="models-search">
-              <Search size={14} />
-              <input
-                className="models-search-input"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("models.searchPlaceholder")}
-              />
+          <div className="models-toolbar">
+            {models.length > 0 && (
+              <div className="models-search">
+                <Search size={14} />
+                <input
+                  className="models-search-input"
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("models.searchPlaceholder")}
+                />
+              </div>
+            )}
+            <div className="models-header-actions">
+              <a
+                href="https://github.com/hermesonehq/hermes-registry"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary btn-sm"
+                title="Open Registry on GitHub"
+              >
+                <ExternalLink size={14} />
+                Registry
+              </a>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => openRegistry()}
+              >
+                <Sparkles size={14} />
+                {t("models.browseRegistry")}
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={openAddModal}>
+                <Plus size={14} />
+                {t("models.addModel")}
+              </button>
             </div>
-          )}
+          </div>
 
           {providerChips.length > 1 && (
             <div className="models-provider-chips">
@@ -717,16 +723,18 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
 
       {activeTab === "auxiliary" && (
         <>
-          <div className="settings-field-hint" style={{ marginBottom: 10 }}>
-            {t("constants.auxiliaryDescription")}
-          </div>
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ marginBottom: 15 }}
-            onClick={handleResetAux}
-          >
-            {t("constants.auxiliaryResetAll")}
-          </button>
+          <section className="auxiliary-header">
+            <div className="settings-field-hint" style={{ marginBottom: 10 }}>
+              {t("constants.auxiliaryDescription")}
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ marginBottom: 15 }}
+              onClick={handleResetAux}
+            >
+              {t("constants.auxiliaryResetAll")}
+            </button>
+          </section>
           <div className="provider-keys-grid">
             {auxConfig.map((task) => {
               const labels = auxTaskLabels[task.task];
@@ -760,10 +768,6 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
             })}
           </div>
         </>
-      )}
-
-      {activeTab === "council" && (
-        <CouncilTab visible={visible && activeTab === "council"} />
       )}
 
       {showModal && (

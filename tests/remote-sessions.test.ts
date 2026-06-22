@@ -364,6 +364,8 @@ describe("remote session REST bridge", () => {
         source: "chat",
         messageCount: 2,
         model: "custom/deepseek-v4-pro",
+        // Remote sessions have no local desktop folder binding (issue #27).
+        contextFolder: null,
       },
     ]);
   });

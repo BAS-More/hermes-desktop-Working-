@@ -4,7 +4,7 @@ export default {
   noModel: "No model set",
   auto: "Auto",
   commandsTitle: "Commands",
-  typeMessage: "Type a message... (Shift+Enter for new line)",
+  typeMessage: "Ask anything",
   quickAskTitle:
     "Quick Ask (/btw) — side question that won't affect conversation context",
   council: "LLM Council",
@@ -150,6 +150,15 @@ export default {
     openTerminalFailed: "Could not open a terminal for this folder.",
     fileTruncated: "truncated",
     fileTruncatedWarning: "File is too large — showing first 100KB only",
+  },
+  folderPicker: {
+    title: "Choose working directory",
+    parent: "Go to parent folder",
+    open: "Open",
+    select: "Select folder",
+    empty: "No folders here",
+    unavailable:
+      "This connection cannot list folders here. Enter the remote path and select it.",
   },
   showWorktree: "Show file explorer",
   hideWorktree: "Hide file explorer",

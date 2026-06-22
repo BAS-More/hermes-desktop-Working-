@@ -11,6 +11,7 @@ import {
 } from "electron";
 import { join, extname } from "path";
 import { randomUUID } from "crypto";
+import type { SessionModelOverride } from "../shared/model-override";
 import { readdir, readFile, stat } from "fs/promises";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import type { AppUpdater } from "electron-updater";
@@ -375,9 +376,6 @@ import {
 } from "./ssh-remote";
 import { applyGpuPreferences, installGpuCrashGuard } from "./gpu-fallback";
 
-// Disable hardware acceleration up front if a prior launch detected a fatal
-// GPU crash (or the user forced it). MUST run before app is ready. See
-// gpu-fallback.ts / issue #592.
 applyGpuPreferences();
 installGpuCrashGuard();
 
@@ -1393,7 +1391,7 @@ function setupIPC(): void {
       attachments?: Attachment[],
       contextFolder?: string,
       runId?: string,
-      modelOverride?: string,
+      modelOverride?: SessionModelOverride,
     ) => {
       // Each conversation has a stable runId minted by the renderer. Fall back
       // to a generated id for legacy callers so the run is still tracked.

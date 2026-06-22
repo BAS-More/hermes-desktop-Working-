@@ -3,6 +3,7 @@
 The top strip of the main window is a browser-style title bar: it is the window's drag region, and the open-conversation tabs live *on* it rather than in a separate bar below, so no vertical space is spent on a dedicated, always-empty drag strip.
 
 On macOS the window is frameless (`titleBarStyle: "hiddenInset"`, traffic lights inset at x/y 16 — see [[src/main/index.ts]]), and [[src/renderer/src/App.tsx]] renders a fixed full-width `.drag-region` (`-webkit-app-region: drag`, z-index 1000) so the whole top band — including over the sidebar/traffic-light area — drags the window. This strip is mac-only; other platforms keep the OS title bar.
+On macOS the window is frameless (`titleBarStyle: "hiddenInset"`, traffic lights inset at x/y 16 — see [[src/main/app/start.ts#startMainProcess]]), and [[src/renderer/src/App.tsx]] renders a fixed full-width `.drag-region` (`-webkit-app-region: drag`, z-index 1000) so the whole top band — including over the sidebar/traffic-light area — drags the window. This strip is mac-only; other platforms keep the OS title bar.
 
 `.app` fills the window (`height: 100vh`) so the chrome reaches every edge. The sidebar is a flush full-height panel: it only rounds its left corners (`border-radius: 16px 0 0 16px`) to follow the window's rounded corners, while its right edge is square against the content column.
 
@@ -21,6 +22,11 @@ Visually the strip is a Safari-style tab bar: the strip uses the darker `--bg-se
 The bar always renders so it is always a drag area, but chips appear only when there is something to switch between. With a single idle conversation the strip is an empty toolbar band, costing no extra bar height.
 
 Chips show when more than one run is open, or any run is loading (`showChips` in [[src/renderer/src/screens/Layout/ActiveSessionsBar.tsx#ActiveSessionsBar]]).
+## Blank until a real session exists
+
+The bar always renders so it is always a drag area, but chips stay hidden only while the sole conversation is still a blank scratch chat.
+
+Chips show when more than one run is open, any run is loading, or any run has a session id/title (`showChips` in [[src/renderer/src/screens/Layout/ActiveSessionsBar.tsx#ActiveSessionsBar]]). When chips show, a browser-style new-tab **"+"** button (`.active-session-new`, `no-drag`) trails them and calls `onNew` → `handleNewChat` in [[src/renderer/src/screens/Layout/Layout.tsx]] to open a fresh conversation.
 
 Because the bar doubles as the drag strip, [[src/renderer/src/screens/Layout/Layout.tsx]] renders it as the first child of `.content`; the verify-warning banner (when shown) sits just below it, clear of the drag layer.
 

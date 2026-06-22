@@ -39,8 +39,11 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   const { t } = useI18n();
 
   const anyLoading = runs.some((r) => r.loading);
-  // Nothing to switch between → leave the strip empty (pure drag area).
-  const showChips = runs.length > 1 || anyLoading;
+  // Leave the strip empty (pure drag area) only for a single blank scratch
+  // conversation — no sessionId yet and nothing streaming. A resumed/titled
+  // session, multiple sessions, or any in-flight run all surface chips.
+  const anyResumed = runs.some((r) => r.sessionId);
+  const showChips = runs.length > 1 || anyLoading || anyResumed;
 
   return (
     <div className="active-sessions-bar" role="tablist">

@@ -202,8 +202,8 @@ function Layout({
     kind: "skills" | "mcps";
     nonce: number;
   } | null>(null);
-  // Set by the Factory Builds pane to open a build's task detail in Kanban.
-  const [kanbanFocusTaskId, setKanbanFocusTaskId] = useState<string | null>(null);
+  // Set by the Factory Builds pane — Kanban integration deferred.
+  // const [kanbanFocusTaskId, setKanbanFocusTaskId] = useState<string | null>(null);
 
   const paneStyle = (target: View): React.CSSProperties => ({
     display: view === target ? "flex" : "none",
@@ -226,8 +226,8 @@ function Layout({
   );
 
   const focusKanbanTask = useCallback(
-    (taskId: string) => {
-      setKanbanFocusTaskId(taskId);
+    (_taskId: string) => {
+      // Kanban focus integration deferred
       goTo("kanban");
     },
     [goTo],
@@ -780,8 +780,6 @@ function Layout({
               <Kanban
                 profile={activeProfile}
                 visible={view === "kanban"}
-                focusTaskId={kanbanFocusTaskId}
-                onFocusHandled={() => setKanbanFocusTaskId(null)}
               />
             )}
           </div>

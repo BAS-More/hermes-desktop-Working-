@@ -17,6 +17,15 @@ function gpuEnvOverride(): "on" | "off" | null {
   return null;
 }
 
+function shouldHonorPersistedGpuFlag(): boolean {
+  if (process.env.HERMES_GPU_FALLBACK === "1") return true;
+  if (process.env.HERMES_GPU_FALLBACK === "0") return false;
+  // The persistent fallback targets Windows/Linux GPU crash loops caused by
+  // virtual adapters and constrained GPU stacks. On macOS it can permanently
+  // push the Office tab onto slow SwiftShader after a transient GPU hiccup.
+  return process.platform !== "darwin";
+}
+
 // Some machines — notably Windows boxes running remote-control software that
 // installs virtual display adapters (Todesk, GameViewer/向日葵, TeamViewer,
 // Sunlogin, etc.) — confuse Chromium's GPU initialization. The GPU process
@@ -53,6 +62,7 @@ export function isGpuDisabled(): boolean {
   if (env === "off") return false;
   if (env === "on") return true;
   if (process.argv.includes(GPU_DISABLE_ARG)) return true;
+  if (!shouldHonorPersistedGpuFlag()) return false;
   try {
     return existsSync(flagPath());
   } catch {
@@ -83,7 +93,9 @@ function clearGpuFlag(): void {
 export function applyGpuPreferences(): void {
   // An explicit force-enable should also wipe any persisted flag so the
   // choice sticks on future launches, not just this one.
-  if (gpuEnvOverride() === "off") clearGpuFlag();
+  if (gpuEnvOverride() === "off" || !shouldHonorPersistedGpuFlag()) {
+    clearGpuFlag();
+  }
   if (!isGpuDisabled()) return;
   console.warn(
     "[GPU] Hardware acceleration disabled (software rendering). " +
@@ -92,7 +104,13 @@ export function applyGpuPreferences(): void {
   app.disableHardwareAcceleration();
   app.commandLine.appendSwitch("disable-gpu");
   app.commandLine.appendSwitch("disable-gpu-compositing");
-  app.commandLine.appendSwitch("disable-software-rasterizer");
+  // Keep the software (SwiftShader) rasterizer available so WebGL surfaces — the
+  // Office 3D tab — still render when hardware acceleration is off (VMs, headless
+  // GPUs, machines whose GPU process crashes). We deliberately do NOT pass
+  // --disable-software-rasterizer. Chromium 136 gates SwiftShader-backed WebGL
+  // behind --enable-unsafe-swiftshader, so opt in explicitly; without it WebGL
+  // context creation fails ("Could not create a WebGL context ... Disabled").
+  app.commandLine.appendSwitch("enable-unsafe-swiftshader");
 }
 
 /** Persist the disable-gpu flag. Returns false if the write failed so the
@@ -118,6 +136,7 @@ function persistGpuDisabled(): boolean {
  * Register this early (before app is ready); the event itself fires later.
  */
 export function installGpuCrashGuard(): void {
+  if (!shouldHonorPersistedGpuFlag()) return;
   // Already running with GPU disabled — nothing left to guard against.
   if (isGpuDisabled()) return;
 

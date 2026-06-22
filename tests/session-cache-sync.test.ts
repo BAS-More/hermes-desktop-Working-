@@ -169,10 +169,25 @@ vi.mock("better-sqlite3", () => {
           .map((s) => ({ id: s.id, message_count: s.message_count }));
       }
 
+      // Context-folder batch read (issue #27). These tests never seed linked
+      // folders, so report none — `tableExists` returns false above, so this
+      // is only a defensive fallback if the lookup path ever changes.
+      if (this.sql.includes("desktop_session_context_folders")) {
+        return [];
+      }
+
       throw new Error(`Unhandled fake all SQL: ${this.sql}`);
     }
 
     get(...args: unknown[]): { content: string } | undefined {
+      // `tableExists` probes sqlite_master before reading context folders
+      // (issue #27). The desktop context-folder table is never created in
+      // these tests, so report it absent — sessions then resolve to a null
+      // contextFolder instead of throwing on an unhandled query.
+      if (this.sql.includes("sqlite_master")) {
+        return undefined;
+      }
+
       if (this.sql.includes("SELECT content FROM messages")) {
         const sessionId = String(args[0]);
         const match = this.store.messages

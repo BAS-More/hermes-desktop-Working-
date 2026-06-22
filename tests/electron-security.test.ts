@@ -11,7 +11,10 @@ import {
 } from "../src/main/security";
 
 const ROOT = join(__dirname, "..");
-const mainSrc = readFileSync(join(ROOT, "src/main/index.ts"), "utf-8");
+// Main-process window/security wiring lives in the startup module after the
+// app/ refactor; index.ts only bootstraps it via startMainProcess().
+const mainSrc = readFileSync(join(ROOT, "src/main/app/start.ts"), "utf-8");
+const menuSrc = readFileSync(join(ROOT, "src/main/app/menu.ts"), "utf-8");
 const preloadSrc = readFileSync(join(ROOT, "src/preload/index.ts"), "utf-8");
 const installerSrc = readFileSync(join(ROOT, "src/main/installer.ts"), "utf-8");
 
@@ -22,6 +25,22 @@ describe("Electron main process hardening", () => {
     expect(mainSrc).toContain("sandbox: true");
     expect(mainSrc).toContain("webSecurity: true");
     expect(mainSrc).toContain("allowRunningInsecureContent: false");
+  });
+
+  it("keeps a production diagnostics path for renderer DevTools", () => {
+    expect(mainSrc).toContain("HERMES_OPEN_DEVTOOLS");
+    expect(mainSrc).toContain("openDevTools({ mode: \"detach\" })");
+    expect(menuSrc).toContain("Toggle Developer Tools");
+    expect(menuSrc).toContain("toggleDevTools()");
+  });
+
+  it("loads the packaged renderer next to the bundled main output", () => {
+    expect(mainSrc).toContain(
+      'join(__dirname, "../renderer/index.html")',
+    );
+    expect(mainSrc).not.toContain(
+      'join(__dirname, "../../renderer/index.html")',
+    );
   });
 
   it("blocks untrusted top-level navigation and webview attachment", () => {

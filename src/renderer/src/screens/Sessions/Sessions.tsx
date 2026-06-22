@@ -733,7 +733,7 @@ function Sessions({
       try {
         const cached = await window.hermesAPI.listCachedSessions(50);
         if (loadRequestId.current === requestId) {
-          setSessions(cached as SessionRow[]);
+          setSessions(cached as unknown as SessionRow[]);
         }
       } catch (cacheError) {
         console.error("Failed to load cached sessions", cacheError);

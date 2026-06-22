@@ -35,14 +35,14 @@ export default {
   },
   analytics: {
     label: "Send anonymous usage analytics",
-    hint: "Helps improve Hermes One by sending anonymous, aggregated usage data to the project's PostHog instance. You can turn this off at any time.",
+    hint: "Helps improve Hermes One by sending anonymous, aggregated usage data to the project's analytics service. You can turn this off at any time.",
     disclosure: {
       uuid: "A random per-install identifier stored only on this device (no name, email, or account info).",
       platform: "Your operating system, Electron version, and Node.js version.",
       navigation:
         "Which screens you visit inside the app (e.g. Chat, Sessions, Settings). No chat content, prompts, model responses, or file contents are collected.",
       endpoint:
-        "Data is sent to us.i.posthog.com (PostHog US cloud). Session recordings and pageview auto-capture are disabled.",
+        "Data is sent to the Hermes analytics service (analytics.hermesone.org). Session recordings and pageview auto-capture are disabled.",
       notCollected:
         "Never collected: chat messages, file paths, API keys, model configuration, account credentials.",
     },
@@ -75,6 +75,8 @@ export default {
   discoveryError:
     "Couldn't reach the provider's model list — you can still type a model name",
   customBaseUrlHint: "OpenAI-compatible API endpoint",
+  compatApiKeyHint:
+    "Stored as {{envVar}} — required for remote endpoints, optional for localhost.",
   poolHint:
     "Add multiple API Keys for the same provider for automatic rotation and load balancing. Hermes will cycle through them.",
   add: "Add",
@@ -103,6 +105,9 @@ export default {
   updating: "Updating...",
   updateEngine: "Update Engine",
   latestVersion: "Already up to date",
+  autoUpgradeDesktop: "Auto-upgrade desktop app",
+  autoUpgradeDesktopHint:
+    "Automatically download new Hermes One releases from GitHub when the app starts. Turn this off to show the startup upgrade button without downloading until you click it.",
   runningDiagnosis: "Running diagnosis...",
   runDiagnosis: "Run Diagnosis",
   running: "Running...",

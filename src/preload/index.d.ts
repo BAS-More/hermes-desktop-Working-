@@ -1,5 +1,6 @@
 import type { AppLocale } from "../shared/i18n/types";
 import type { Attachment } from "../shared/attachments";
+import type { SessionModelOverride } from "../shared/model-override";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
 import type { DesktopSessionLocalError } from "../shared/session-continuation";
 import type {
@@ -523,7 +524,7 @@ interface HermesAPI {
     attachments?: Attachment[],
     contextFolder?: string,
     runId?: string,
-    modelOverride?: string,
+    modelOverride?: SessionModelOverride,
   ) => Promise<{ response: string; sessionId?: string }>;
   abortChat: (runId?: string) => Promise<void>;
   transcribeAudio: (
@@ -717,6 +718,18 @@ interface HermesAPI {
     sessionId: string,
     error: DesktopSessionLocalError,
   ) => Promise<boolean>;
+  getSessionContextFolder: (sessionId: string) => Promise<string | null>;
+  setSessionContextFolder: (
+    sessionId: string,
+    folder: string | null,
+  ) => Promise<boolean>;
+  getSessionModelOverride: (
+    sessionId: string,
+  ) => Promise<SessionModelOverride | null>;
+  setSessionModelOverride: (
+    sessionId: string,
+    override: SessionModelOverride | null,
+  ) => Promise<boolean>;
 
   // Profiles
   listProfiles: () => Promise<
@@ -833,6 +846,7 @@ interface HermesAPI {
       source: string;
       messageCount: number;
       model: string;
+      contextFolder: string | null;
     }>
   >;
   syncSessionCache: () => Promise<
@@ -843,6 +857,7 @@ interface HermesAPI {
       source: string;
       messageCount: number;
       model: string;
+      contextFolder: string | null;
     }>
   >;
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
@@ -1021,6 +1036,8 @@ interface HermesAPI {
   downloadUpdate: () => Promise<boolean>;
   installUpdate: () => Promise<void>;
   getAppVersion: () => Promise<string>;
+  getAutoUpgradeEnabled: () => Promise<boolean>;
+  setAutoUpgradeEnabled: (enabled: boolean) => Promise<boolean>;
   onUpdateAvailable: (
     callback: (info: { version: string; releaseNotes: string }) => void,
   ) => () => void;
@@ -1180,6 +1197,15 @@ interface HermesAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   kanbanArchiveTask: (
     taskId: string,
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  kanbanPromoteTask: (
+    taskId: string,
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  kanbanScheduleTask: (
+    taskId: string,
+    reason?: string,
     profile?: string,
   ) => Promise<{ success: boolean; error?: string }>;
   kanbanSpecifyTask: (
