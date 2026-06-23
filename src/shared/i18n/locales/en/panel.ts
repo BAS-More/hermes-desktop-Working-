@@ -1,5 +1,6 @@
 export default {
   title: "Agent panel",
+  toggle: "Toggle agent panel",
   sections: "Panel sections",
   tab: {
     todo: "To-do",
