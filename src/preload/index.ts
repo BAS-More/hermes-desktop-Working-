@@ -1432,6 +1432,8 @@ const hermesAPI = {
     ipcRenderer.invoke("read-file", filePath, maxBytes),
   openFileInEditor: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke("open-file-in-editor", filePath),
+  revealInFolder: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke("reveal-in-folder", filePath),
   openTerminal: (dirPath: string): Promise<boolean> =>
     ipcRenderer.invoke("open-terminal", dirPath),
   readImageFile: (filePath: string): Promise<string | null> =>

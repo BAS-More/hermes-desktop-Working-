@@ -13021,3 +13021,61 @@ body {
   background: color-mix(in srgb, var(--accent) 25%, transparent) !important;
   color: var(--accent) !important;
 }
+
+/* ============================================================
+   Phase 1 — Diff cockpit v1 (DiffView.tsx)
+   ============================================================ */
+:root {
+  --diff-add-bg: rgba(46, 160, 67, 0.15);
+  --diff-add-fg: #2ea043;
+  --diff-del-bg: rgba(248, 81, 73, 0.15);
+  --diff-del-fg: #f85149;
+  --diff-gutter-w: 3.5rem;
+}
+.diff-view { display: flex; flex-direction: column; height: 100%; min-height: 0;
+  background: var(--bg-base); color: var(--text-primary);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.diff-view-empty { display: flex; align-items: center; justify-content: center;
+  height: 100%; color: var(--text-muted); font-style: italic; }
+.diff-toolbar { display: flex; align-items: center; gap: .5rem;
+  padding: .4rem .75rem; border-bottom: 1px solid var(--border-subtle); }
+.diff-total-badge { font-weight: 600; font-size: .8rem; color: var(--text-secondary);
+  padding: .1rem .45rem; border-radius: var(--radius-sm); background: var(--bg-secondary); }
+.diff-body { display: flex; flex: 1; min-height: 0; }
+.diff-file-list { width: 16rem; flex-shrink: 0; overflow-y: auto; margin: 0;
+  padding: .35rem; list-style: none; border-right: 1px solid var(--border-subtle); }
+.diff-file-row { display: flex; align-items: center; gap: .4rem; width: 100%;
+  padding: .3rem .45rem; border: none; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm); color: var(--text-secondary); text-align: left; }
+.diff-file-row:hover { background: var(--bg-hover); }
+.diff-file-row-active { background: var(--accent-subtle); color: var(--text-primary); }
+.diff-file-icon { width: 14px; height: 14px; flex-shrink: 0; opacity: .7; }
+.diff-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .8rem; }
+.diff-file-status { font-size: .62rem; text-transform: uppercase; opacity: .7; }
+.diff-file-badge { font-size: .72rem; font-variant-numeric: tabular-nums; opacity: .85; }
+.diff-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.diff-pane-header { display: flex; align-items: center; gap: .35rem;
+  padding: .4rem .6rem; border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary); }
+.diff-pane-caret { width: 14px; height: 14px; opacity: .6; }
+.diff-pane-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .82rem; color: var(--text-primary); }
+.diff-pane-actions { display: flex; gap: .25rem; }
+.diff-action-btn { display: inline-flex; padding: .2rem; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; border-radius: var(--radius-sm); }
+.diff-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.diff-action-btn svg { width: 15px; height: 15px; }
+.diff-sbs { width: 100%; border-collapse: collapse; overflow: auto; display: block;
+  flex: 1; font-size: .78rem; }
+.diff-sbs-row td { vertical-align: top; }
+.diff-sbs-gutter { width: var(--diff-gutter-w); padding: 0 .5rem; text-align: right;
+  color: var(--text-muted); user-select: none; font-variant-numeric: tabular-nums;
+  border-right: 1px solid var(--border-subtle); }
+.diff-sbs-cell { padding: 0 .5rem; white-space: pre-wrap; word-break: break-word;
+  width: 50%; }
+.diff-sbs-cell.diff-add { background: var(--diff-add-bg); }
+.diff-sbs-cell.diff-del { background: var(--diff-del-bg); }
+.diff-sbs-gutter.diff-add { color: var(--diff-add-fg); }
+.diff-sbs-gutter.diff-del { color: var(--diff-del-fg); }
+.diff-sbs-cell.diff-blank { background: var(--bg-secondary); opacity: .4; }

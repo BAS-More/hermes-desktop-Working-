@@ -14,6 +14,7 @@ export {
   Plug,
   Workflow,
   ExternalLink,
+  FileText,
   Folder,
   KeyRound,
   Layers,

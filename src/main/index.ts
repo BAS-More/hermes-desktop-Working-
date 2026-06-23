@@ -2635,6 +2635,19 @@ function setupIPC(): void {
     }
   });
 
+  // Reveal a file in Finder/Explorer (diff cockpit "reveal in folder").
+  ipcMain.handle("reveal-in-folder", async (_event, filePath: string) => {
+    try {
+      if (typeof filePath !== "string" || filePath.trim().length === 0) {
+        return false;
+      }
+      shell.showItemInFolder(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   ipcMain.handle("open-terminal", async (_event, dirPath: string) => {
     if (isRemoteOnlyMode()) return false;
     if (typeof dirPath !== "string" || dirPath.trim().length === 0)
