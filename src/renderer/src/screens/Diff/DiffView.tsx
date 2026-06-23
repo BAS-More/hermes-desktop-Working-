@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   parseUnifiedDiff,
   toSideBySide,
@@ -6,6 +6,11 @@ import {
   totalBadge,
   type FileDiff,
 } from "../../../../shared/diff-model";
+import {
+  commentsForLine,
+  type CommentAnchor,
+  type DiffSide,
+} from "../../../../shared/review-anchor";
 import { ChevronRight, ExternalLink, FileText, Folder } from "../../assets/icons";
 
 export interface DiffViewProps {
@@ -15,6 +20,12 @@ export interface DiffViewProps {
   onOpenExternal?: (path: string) => void;
   /** Reveal a file in Finder/Explorer (preload: reveal-in-folder). */
   onRevealInFolder?: (path: string) => void;
+  /** Existing inline review comments to render against the active file. */
+  comments?: CommentAnchor[];
+  /** Called when the user submits a new inline comment on a line. */
+  onAddComment?: (path: string, side: DiffSide, lineNo: number, text: string) => void;
+  /** Called when the user clicks "Review code" (agent self-review). */
+  onReviewCode?: (path: string) => void;
   /** Optional translator; defaults to identity so the component is usable bare. */
   t?: (key: string) => string;
 }
@@ -34,10 +45,17 @@ export function DiffView({
   patch,
   onOpenExternal,
   onRevealInFolder,
+  comments = [],
+  onAddComment,
+  onReviewCode,
   t = (k) => k,
 }: DiffViewProps): React.JSX.Element {
   const files = parseUnifiedDiff(patch);
   const [selected, setSelected] = useState(0);
+  const [draft, setDraft] = useState<{ side: DiffSide; lineNo: number } | null>(
+    null,
+  );
+  const [draftText, setDraftText] = useState("");
 
   if (files.length === 0) {
     return (
@@ -101,6 +119,16 @@ export function DiffView({
               {active.path}
             </span>
             <div className="diff-pane-actions">
+              {onReviewCode && (
+                <button
+                  type="button"
+                  className="diff-action-btn diff-review-btn"
+                  data-testid="diff-review-code"
+                  onClick={() => onReviewCode(active.path)}
+                >
+                  {t("diff.reviewCode")}
+                </button>
+              )}
               {onOpenExternal && (
                 <button
                   type="button"
@@ -128,42 +156,116 @@ export function DiffView({
 
           <table className="diff-sbs" data-testid="diff-sbs">
             <tbody>
-              {rows.map((row, idx) => (
-                <tr key={idx} className="diff-sbs-row">
-                  <td
-                    className={
-                      "diff-sbs-gutter" +
-                      (row.left ? " diff-" + row.left.kind : "")
-                    }
-                  >
-                    {row.left?.lineNo ?? ""}
-                  </td>
-                  <td
-                    className={
-                      "diff-sbs-cell diff-sbs-left" +
-                      (row.left ? " diff-" + row.left.kind : " diff-blank")
-                    }
-                  >
-                    {row.left?.text ?? ""}
-                  </td>
-                  <td
-                    className={
-                      "diff-sbs-gutter" +
-                      (row.right ? " diff-" + row.right.kind : "")
-                    }
-                  >
-                    {row.right?.lineNo ?? ""}
-                  </td>
-                  <td
-                    className={
-                      "diff-sbs-cell diff-sbs-right" +
-                      (row.right ? " diff-" + row.right.kind : " diff-blank")
-                    }
-                  >
-                    {row.right?.text ?? ""}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row, idx) => {
+                const rightLine = row.right?.lineNo;
+                const lineComments =
+                  rightLine !== undefined
+                    ? commentsForLine(comments, active.path, "new", rightLine)
+                    : [];
+                const isDrafting =
+                  draft?.side === "new" && draft.lineNo === rightLine;
+                return (
+                  <React.Fragment key={idx}>
+                    <tr className="diff-sbs-row">
+                      <td
+                        className={
+                          "diff-sbs-gutter" +
+                          (row.left ? " diff-" + row.left.kind : "")
+                        }
+                      >
+                        {row.left?.lineNo ?? ""}
+                      </td>
+                      <td
+                        className={
+                          "diff-sbs-cell diff-sbs-left" +
+                          (row.left ? " diff-" + row.left.kind : " diff-blank")
+                        }
+                      >
+                        {row.left?.text ?? ""}
+                      </td>
+                      <td
+                        className={
+                          "diff-sbs-gutter" +
+                          (row.right ? " diff-" + row.right.kind : "")
+                        }
+                      >
+                        {row.right?.lineNo ?? ""}
+                      </td>
+                      <td
+                        className={
+                          "diff-sbs-cell diff-sbs-right" +
+                          (row.right ? " diff-" + row.right.kind : " diff-blank") +
+                          (onAddComment && rightLine !== undefined
+                            ? " diff-commentable"
+                            : "")
+                        }
+                        data-testid="diff-line-right"
+                        onClick={
+                          onAddComment && rightLine !== undefined
+                            ? () => {
+                                setDraft({ side: "new", lineNo: rightLine });
+                                setDraftText("");
+                              }
+                            : undefined
+                        }
+                      >
+                        {row.right?.text ?? ""}
+                      </td>
+                    </tr>
+                    {lineComments.map((c) => (
+                      <tr key={c.id} className="diff-comment-row">
+                        <td />
+                        <td colSpan={3}>
+                          <div
+                            className={
+                              "diff-comment" + (c.orphaned ? " diff-comment-orphaned" : "")
+                            }
+                            data-testid="diff-comment"
+                          >
+                            {c.orphaned ? `⚠ ${c.comment}` : c.comment}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {isDrafting && (
+                      <tr className="diff-comment-draft-row">
+                        <td />
+                        <td colSpan={3}>
+                          <div className="diff-comment-draft">
+                            <textarea
+                              className="diff-comment-input"
+                              data-testid="diff-comment-input"
+                              value={draftText}
+                              autoFocus
+                              onChange={(e) => setDraftText(e.target.value)}
+                              placeholder={t("diff.commentPlaceholder")}
+                            />
+                            <button
+                              type="button"
+                              className="diff-comment-submit"
+                              data-testid="diff-comment-submit"
+                              disabled={draftText.trim().length === 0}
+                              onClick={() => {
+                                if (rightLine === undefined) return;
+                                onAddComment?.(
+                                  active.path,
+                                  "new",
+                                  rightLine,
+                                  draftText.trim(),
+                                );
+                                setDraft(null);
+                                setDraftText("");
+                              }}
+                            >
+                              {t("diff.commentSubmit")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
