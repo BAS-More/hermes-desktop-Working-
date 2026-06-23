@@ -1174,6 +1174,7 @@ interface HermesAPI {
     maxBytes?: number,
   ) => Promise<{ content: string; truncated: boolean } | null>;
   openFileInEditor: (filePath: string) => Promise<boolean>;
+  revealInFolder: (filePath: string) => Promise<boolean>;
   openTerminal: (dirPath: string) => Promise<boolean>;
   readImageFile: (filePath: string) => Promise<string | null>;
   kanbanAssignTask: (

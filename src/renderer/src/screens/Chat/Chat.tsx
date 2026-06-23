@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Zap, Globe } from "lucide-react";
+import { Zap, Globe, PanelRight } from "lucide-react";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { buildCouncilPrompt } from "./councilPrompt";
 import { ChatEmptyState } from "./ChatEmptyState";
@@ -28,6 +28,8 @@ import {
   dashboardChatEnabledForConnection,
   useDashboardChatTransport,
 } from "./hooks/useDashboardChatTransport";
+import { useAgentPanel } from "./hooks/useAgentPanel";
+import { RightPanel } from "../Layout/RightPanel";
 import { useI18n } from "../../components/useI18n";
 import { buildChatTranscript } from "./transcriptUtils";
 import { ConfigHealthBanner } from "../../components/ConfigHealthBanner";
@@ -280,6 +282,25 @@ function Chat({
   const modelConfig = useModelConfig(profile);
   const chatCurrentModel =
     sessionModelOverride?.model ?? modelConfig.currentModel;
+  // Live agent-panel visibility (right side-panel). Default-hidden so it never
+  // disrupts the existing layout until explicitly enabled; persisted locally.
+  const [agentPanelVisible, setAgentPanelVisible] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("hermes:agentPanelVisible") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "hermes:agentPanelVisible",
+        agentPanelVisible ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [agentPanelVisible]);
   const chatCurrentProvider =
     sessionModelOverride?.provider ?? modelConfig.currentProvider;
   const chatCurrentBaseUrl =
@@ -560,6 +581,8 @@ function Chat({
     });
   }, [t]);
 
+  const agentPanel = useAgentPanel(chatCurrentModel);
+
   const dashboardTransport = useDashboardChatTransport({
     activeTurnRef,
     contextFolder,
@@ -578,6 +601,7 @@ function Chat({
     setToolProgress,
     setUsage,
     onDashboardUnavailable: handleDashboardUnavailable,
+    onAgentPanelEvent: agentPanel.onAgentPanelEvent,
   });
 
   // Defer a message onto the busy queue (used when a slash command resolves to
@@ -919,6 +943,10 @@ function Chat({
             onInspectElement={handleInspectElement}
           />
         )}
+
+        {agentPanelVisible && (
+          <RightPanel state={agentPanel.state} visible={agentPanelVisible} />
+        )}
       </div>
 
       <div className="chat-input-area">
@@ -941,6 +969,15 @@ function Chat({
           onAbort={actions.handleAbort}
           toolbarExtras={
             <>
+              <button
+                type="button"
+                className="chat-attach-btn"
+                aria-pressed={agentPanelVisible}
+                title={t("panel.toggle")}
+                onClick={() => setAgentPanelVisible((v) => !v)}
+              >
+                <PanelRight size={16} />
+              </button>
               <ModelPicker
                 currentModel={chatCurrentModel}
                 currentProvider={chatCurrentProvider}

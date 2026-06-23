@@ -33,6 +33,8 @@ import constantsEn from "./locales/en/constants";
 import kanbanEn from "./locales/en/kanban";
 import diagnoseEn from "./locales/en/diagnose";
 import councilEn from "./locales/en/council";
+import diffEn from "./locales/en/diff";
+import panelEn from "./locales/en/panel";
 import commonHe from "./locales/he/common";
 import navigationHe from "./locales/he/navigation";
 import discoverHe from "./locales/he/discover";
@@ -274,6 +276,8 @@ export const resources = {
       kanban: kanbanEn,
       diagnose: diagnoseEn,
       council: councilEn,
+      diff: diffEn,
+      panel: panelEn,
     },
   },
   he: {

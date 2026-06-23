@@ -98,6 +98,10 @@ interface UseDashboardChatTransportArgs {
    *  unavailable on a remote/SSH connection and the renderer is falling back to
    *  the legacy HTTP transport. Lets the UI surface a one-time notice. */
   onDashboardUnavailable?: (reason: string) => void;
+  /** Optional tap on the raw event stream so the right-side agent panel can
+   *  fold todo/task/diff/review/plan/usage updates into its own state without
+   *  disturbing the chat reducer. Opt-in: when omitted, behavior is unchanged. */
+  onAgentPanelEvent?: (event: DashboardStreamEvent) => void;
 }
 
 interface UseDashboardChatTransportResult {
@@ -813,6 +817,7 @@ export function useDashboardChatTransport({
   setToolProgress,
   setUsage,
   onDashboardUnavailable,
+  onAgentPanelEvent,
 }: UseDashboardChatTransportArgs): UseDashboardChatTransportResult {
   const clientRef = useRef<DashboardGatewayClient | null>(null);
   const connectingRef = useRef<Promise<DashboardGatewayClient> | null>(null);
@@ -882,6 +887,17 @@ export function useDashboardChatTransport({
         return;
       }
       logDashboardEvent(event, "accepted", runtimeSessionId);
+
+      // Tap the accepted event stream for the right-side agent panel (todo,
+      // tasks, diff, review, plan, usage). Best-effort and isolated: a panel
+      // consumer error must never break the chat transport.
+      if (onAgentPanelEvent) {
+        try {
+          onAgentPanelEvent(event);
+        } catch {
+          // swallow — panel folding is non-critical to the chat turn
+        }
+      }
 
       // Background (`/btw`) prompts run on a separate agent and report back via
       // `background.complete` — outside the main turn lifecycle, so render the
@@ -995,6 +1011,7 @@ export function useDashboardChatTransport({
       setMessages,
       setToolProgress,
       setUsage,
+      onAgentPanelEvent,
     ],
   );
 
