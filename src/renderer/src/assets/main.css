@@ -13079,3 +13079,69 @@ body {
 .diff-sbs-gutter.diff-add { color: var(--diff-add-fg); }
 .diff-sbs-gutter.diff-del { color: var(--diff-del-fg); }
 .diff-sbs-cell.diff-blank { background: var(--bg-secondary); opacity: .4; }
+
+/* ============================================================
+   Phase 3 — Right side-panel + always-visible auto-ticking todo
+   ============================================================ */
+.right-panel { display: flex; flex-direction: column; width: 22rem; flex-shrink: 0;
+  height: 100%; min-height: 0; border-left: 1px solid var(--border-subtle);
+  background: var(--bg-secondary); color: var(--text-primary); }
+.right-panel-tabs { display: flex; gap: .1rem; padding: .35rem .35rem 0;
+  border-bottom: 1px solid var(--border-subtle); overflow-x: auto; }
+.right-panel-tab { padding: .35rem .55rem; border: none; background: transparent;
+  color: var(--text-muted); cursor: pointer; font-size: .76rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0; white-space: nowrap; }
+.right-panel-tab:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.right-panel-tab-active { color: var(--text-primary); background: var(--bg-base);
+  border-bottom: 2px solid var(--accent); }
+.right-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: .6rem; }
+.panel-section { display: flex; flex-direction: column; gap: .4rem; }
+.panel-empty { color: var(--text-muted); font-style: italic; font-size: .8rem; }
+
+/* always-visible todo */
+.panel-todo-header { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; }
+.todo-progress { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .82rem;
+  color: var(--text-secondary); }
+.todo-progress-bar { flex: 1; height: 6px; background: var(--bg-tertiary);
+  border-radius: 999px; overflow: hidden; }
+.todo-progress-fill { height: 100%; background: var(--accent); border-radius: 999px;
+  transition: width .25s ease; }
+.todo-checklist { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: .15rem; }
+.todo-item { display: flex; align-items: center; gap: .45rem; padding: .25rem .35rem;
+  border-radius: var(--radius-sm); font-size: .82rem; }
+.todo-item:hover { background: var(--bg-hover); }
+.todo-icon { width: 14px; height: 14px; flex-shrink: 0; }
+.todo-done { color: var(--accent); }
+.todo-active { color: #d29922; }
+.todo-pending { color: var(--text-muted); opacity: .6; }
+.todo-cancelled { color: var(--text-muted); }
+.todo-completed .todo-text { text-decoration: line-through; color: var(--text-muted); }
+.todo-cancelled .todo-text { text-decoration: line-through; opacity: .6; }
+.todo-text { flex: 1; }
+
+/* tasks / plan / diff / review */
+.task-list, .plan-steps, .panel-diff-files, .review-list { list-style: none; margin: 0;
+  padding: 0; display: flex; flex-direction: column; gap: .25rem; }
+.plan-steps { list-style: decimal inside; }
+.task-item { display: flex; justify-content: space-between; font-size: .8rem;
+  padding: .2rem .3rem; border-radius: var(--radius-sm); background: var(--bg-base); }
+.task-running .task-progress { color: #d29922; }
+.task-succeeded .task-progress { color: var(--accent); }
+.task-failed .task-progress { color: var(--diff-del-fg); }
+.panel-diff-badge { font-weight: 600; font-size: .85rem; color: var(--text-secondary);
+  margin-bottom: .3rem; }
+.panel-diff-file { display: flex; justify-content: space-between; gap: .5rem;
+  font-size: .78rem; }
+.panel-diff-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-diff-counts { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.review-item { display: flex; flex-direction: column; font-size: .78rem;
+  padding: .25rem .3rem; border-left: 2px solid var(--accent-subtle); }
+.review-loc { color: var(--text-muted); font-size: .7rem; }
+
+/* usage ring */
+.usage-ring { gap: .6rem; }
+.usage-metric { display: flex; justify-content: space-between; align-items: center;
+  padding: .4rem .5rem; background: var(--bg-base); border-radius: var(--radius-md); }
+.usage-label { color: var(--text-muted); font-size: .8rem; }
+.usage-value { font-weight: 600; font-variant-numeric: tabular-nums; }
