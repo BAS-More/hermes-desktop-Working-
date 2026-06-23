@@ -12,6 +12,11 @@ import {
   loadingSessionIds as deriveLoadingSessionIds,
 } from "./chatRuns";
 import { ActiveSessionsBar } from "./ActiveSessionsBar";
+import {
+  saveWorkspace,
+  loadWorkspace,
+  type PersistedTab,
+} from "./workspaceState";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Discover from "../Discover/Discover";
@@ -94,6 +99,26 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
 const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
 const SESSIONS_EXPANDED_KEY = "hermes.sidebar.sessionsExpanded";
 
+// Valid view ids, for validating a restored-from-localStorage `view` string
+// before navigating to it (a stale/forward-incompatible value is ignored).
+const KNOWN_VIEWS: ReadonlySet<View> = new Set<View>([
+  "chat",
+  "sessions",
+  "discover",
+  "agents",
+  "office",
+  "models",
+  "providers",
+  "skills",
+  "memory",
+  "tools",
+  "schedules",
+  "kanban",
+  "factory",
+  "gateway",
+  "settings",
+]);
+
 interface LayoutProps {
   verifyWarning?: boolean;
   onReinstall?: () => void;
@@ -121,6 +146,11 @@ function Layout({
   // otherwise mount two tabs for the same session (the live check straddles an
   // await, so it can't rely on `runs` state alone).
   const resumingRef = useRef<Set<string>>(new Set());
+
+  // Workspace restore gate: we must NOT persist the workspace until the
+  // one-shot launch restore has run, otherwise the initial blank run would
+  // overwrite the saved tab list before we get a chance to reopen it.
+  const workspaceRestoredRef = useRef(false);
 
   const currentSessionId =
     runs.find((r) => r.runId === activeRunId)?.sessionId ?? null;
@@ -267,7 +297,103 @@ function Layout({
     };
   }, []);
 
-  // Auto-update state
+  // ── Workspace restore: reopen the tabs / active tab / view from last launch ──
+  //
+  // One-shot on mount. Reuses the same history-fetch + mintRun plumbing as
+  // handleResumeSession. Guards every failure mode the council named:
+  //   - a saved session that no longer exists (history fetch empty/throws)
+  //   - a saved profile that was deleted (not in listProfiles)
+  //   - a corrupt/forward-incompatible blob (loadWorkspace returns null)
+  // Anything invalid is silently skipped; a fully-empty restore leaves the
+  // default blank run untouched. Sets workspaceRestoredRef so the save effect
+  // can start persisting only AFTER this has run.
+  useEffect(() => {
+    let cancelled = false;
+    const saved = loadWorkspace();
+    if (!saved || saved.tabs.length === 0) {
+      workspaceRestoredRef.current = true;
+      return;
+    }
+    (async () => {
+      try {
+        // Which profiles still exist? Drop tabs whose profile was deleted.
+        let validProfiles = new Set<string>();
+        try {
+          const profiles = await window.hermesAPI.listProfiles();
+          validProfiles = new Set(profiles.map((p) => p.name));
+        } catch {
+          // If we can't enumerate profiles, fall back to allowing all — the
+          // per-session history fetch below still gates on real data.
+          validProfiles = new Set(saved.tabs.map((t) => t.profile));
+        }
+        const candidates: PersistedTab[] = saved.tabs.filter((t) =>
+          validProfiles.has(t.profile),
+        );
+
+        const restoredRuns: ChatRun[] = [];
+        let activeRestoredRunId: string | null = null;
+        for (const tab of candidates) {
+          try {
+            const items = (await window.hermesAPI.getSessionMessagesFromProfile(
+              tab.profile,
+              tab.sessionId,
+            )) as unknown as DbHistoryItem[];
+            // A deleted/empty session yields no history — skip it rather than
+            // resurrect an empty tab.
+            if (!items || items.length === 0) continue;
+            const run = mintRun(tab.profile, dbItemsToChatMessages(items));
+            run.sessionId = tab.sessionId;
+            if (tab.title) run.title = tab.title;
+            restoredRuns.push(run);
+            if (tab.sessionId === saved.activeSessionId) {
+              activeRestoredRunId = run.runId;
+            }
+          } catch {
+            // Session gone or unreadable — skip this tab, keep the rest.
+          }
+        }
+
+        if (cancelled || restoredRuns.length === 0) {
+          workspaceRestoredRef.current = true;
+          return;
+        }
+
+        const activeRunId =
+          activeRestoredRunId ?? restoredRuns[0].runId;
+        const activeRun =
+          restoredRuns.find((r) => r.runId === activeRunId) ?? restoredRuns[0];
+
+        // Replace the initial blank run with the restored set.
+        setRuns(restoredRuns);
+        setActiveRunId(activeRunId);
+        setActiveProfile(activeRun.profile);
+        // Restore the screen the user was on, if it's a known view.
+        if (saved.view && KNOWN_VIEWS.has(saved.view as View)) {
+          goTo(saved.view as View);
+        }
+      } finally {
+        if (!cancelled) workspaceRestoredRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Workspace persist: save open tabs / active tab / view on change ──
+  //
+  // Debounced so rapid state churn (streaming title updates, tab switches)
+  // coalesces into one write. Only runs after the launch restore has completed
+  // (workspaceRestoredRef) so we never clobber the saved list with the initial
+  // blank run before restoring it.
+  useEffect(() => {
+    if (!workspaceRestoredRef.current) return;
+    const handle = setTimeout(() => {
+      saveWorkspace(runs, activeRunId, view);
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [runs, activeRunId, view]);
   const [updateState, setUpdateState] = useState<
     "available" | "downloading" | "ready" | "error" | null
   >(null);
