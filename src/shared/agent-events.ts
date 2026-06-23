@@ -33,11 +33,7 @@ export interface DashboardStreamEvent<T = unknown> {
   type: string;
 }
 
-export type TodoStatus =
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "cancelled";
+export type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
 export interface TodoItem {
   id: string;
@@ -236,9 +232,11 @@ export function applyAgentEvent(
         progress: num(payload.progress),
         state: ((): TaskState => {
           const s = str(payload.state);
-          return (["queued", "running", "failed", "succeeded"].includes(s)
-            ? s
-            : "queued") as TaskState;
+          return (
+            ["queued", "running", "failed", "succeeded"].includes(s)
+              ? s
+              : "queued"
+          ) as TaskState;
         })(),
       };
       const next = state.tasks.filter((t) => t.id !== id);

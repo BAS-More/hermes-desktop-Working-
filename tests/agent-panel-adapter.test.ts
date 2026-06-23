@@ -24,9 +24,10 @@ describe("toolEventToAgentEvents", () => {
     });
     const task = evs.find((e) => e.type === "task.update");
     expect(task).toBeTruthy();
-    expect((task as { payload: { id: string; title: string; state: string } }).payload).toMatchObject(
-      { id: "c1", title: "terminal", state: "running" },
-    );
+    expect(
+      (task as { payload: { id: string; title: string; state: string } })
+        .payload,
+    ).toMatchObject({ id: "c1", title: "terminal", state: "running" });
   });
 
   it("maps a completed tool to a succeeded task", () => {
@@ -35,9 +36,9 @@ describe("toolEventToAgentEvents", () => {
       name: "terminal",
       status: "completed",
     });
-    expect(
-      (evs[0] as { payload: { state: string } }).payload.state,
-    ).toBe("succeeded");
+    expect((evs[0] as { payload: { state: string } }).payload.state).toBe(
+      "succeeded",
+    );
   });
 
   it("maps a failed tool to a failed task", () => {
@@ -46,9 +47,9 @@ describe("toolEventToAgentEvents", () => {
       name: "terminal",
       status: "failed",
     });
-    expect(
-      (evs[0] as { payload: { state: string } }).payload.state,
-    ).toBe("failed");
+    expect((evs[0] as { payload: { state: string } }).payload.state).toBe(
+      "failed",
+    );
   });
 });
 
@@ -56,17 +57,23 @@ describe("usageToAgentEvent", () => {
   it("converts total tokens to a context percentage", () => {
     const ev = usageToAgentEvent({ totalTokens: 32768 }, 131072);
     expect(ev.type).toBe("usage.update");
-    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(25);
+    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(
+      25,
+    );
   });
 
   it("clamps context percentage to 100", () => {
     const ev = usageToAgentEvent({ totalTokens: 500000 }, 131072);
-    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(100);
+    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(
+      100,
+    );
   });
 
   it("is 0 for zero tokens", () => {
     const ev = usageToAgentEvent({ totalTokens: 0 }, 131072);
-    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(0);
+    expect((ev as { payload: { contextPct: number } }).payload.contextPct).toBe(
+      0,
+    );
   });
 });
 
@@ -90,8 +97,16 @@ describe("foldChatEvents", () => {
   it("folds a running then completed tool into one succeeded task", () => {
     let state = initialAgentPanelState();
     const evs = [
-      ...toolEventToAgentEvents("c1", { callId: "c1", name: "terminal", status: "running" }),
-      ...toolEventToAgentEvents("c1", { callId: "c1", name: "terminal", status: "completed" }),
+      ...toolEventToAgentEvents("c1", {
+        callId: "c1",
+        name: "terminal",
+        status: "running",
+      }),
+      ...toolEventToAgentEvents("c1", {
+        callId: "c1",
+        name: "terminal",
+        status: "completed",
+      }),
     ];
     for (const e of evs) state = applyAgentEvent(state, e);
     expect(state.tasks).toHaveLength(1);

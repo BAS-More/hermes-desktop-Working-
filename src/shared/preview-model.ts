@@ -46,13 +46,25 @@ function fnv1a(text: string): string {
  * Persistent partitions get the "persist:" prefix Electron requires for
  * on-disk storage; ephemeral ones are in-memory only.
  */
-export function previewPartition(projectPath: string, persist: boolean): string {
+export function previewPartition(
+  projectPath: string,
+  persist: boolean,
+): string {
   const hash = fnv1a(normalizePath(projectPath));
   const base = `hermes-preview-${hash}`;
   return persist ? `persist:${base}` : base;
 }
 
-const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"]);
+const IMAGE_EXT = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "svg",
+  "webp",
+  "bmp",
+  "ico",
+]);
 const VIDEO_EXT = new Set(["mp4", "webm", "mov", "mkv", "avi", "m4v"]);
 
 /** Classify a preview target by URL scheme or file extension. */

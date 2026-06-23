@@ -27,7 +27,10 @@ describe("WCAG contrast math", () => {
 
   it("parses 3-digit hex like 6-digit hex", () => {
     expect(Math.round(contrastRatio("#fff", "#000"))).toBe(21);
-    expect(relativeLuminance("#fff")).toBeCloseTo(relativeLuminance("#ffffff"), 5);
+    expect(relativeLuminance("#fff")).toBeCloseTo(
+      relativeLuminance("#ffffff"),
+      5,
+    );
   });
 
   it("is symmetric", () => {
@@ -94,10 +97,7 @@ describe("tokenContrastReport", () => {
       const fg = DESIGN_TOKENS[row.tokenFg];
       const bg = DESIGN_TOKENS[row.tokenBg];
       if (!fg || !bg) continue;
-      expect(row.light.ratio).toBeCloseTo(
-        contrastRatio(fg.light, bg.light),
-        4,
-      );
+      expect(row.light.ratio).toBeCloseTo(contrastRatio(fg.light, bg.light), 4);
       expect(row.dark.ratio).toBeCloseTo(contrastRatio(fg.dark, bg.dark), 4);
     }
   });

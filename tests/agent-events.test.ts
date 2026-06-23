@@ -135,8 +135,14 @@ describe("agent-events: diff badge", () => {
 
   it("a later diff.update for the same file replaces its counts", () => {
     const state = reduce([
-      { type: "diff.update", payload: { path: "src/app.ts", added: 12, removed: 1 } },
-      { type: "diff.update", payload: { path: "src/app.ts", added: 20, removed: 4 } },
+      {
+        type: "diff.update",
+        payload: { path: "src/app.ts", added: 12, removed: 1 },
+      },
+      {
+        type: "diff.update",
+        payload: { path: "src/app.ts", added: 20, removed: 4 },
+      },
     ]);
     expect(state.diff).toHaveLength(1);
     expect(diffBadge(state)).toBe("+20 -4");

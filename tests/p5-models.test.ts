@@ -32,12 +32,15 @@ describe("parseDeepLink", () => {
   });
 
   it("rejects a UNC / network cwd", () => {
-    expect(parseDeepLink("hermes://open?cwd=" + encodeURIComponent("\\\\server\\share")).ok).toBe(
-      false,
-    );
-    expect(parseDeepLink("hermes://open?cwd=" + encodeURIComponent("//server/share")).ok).toBe(
-      false,
-    );
+    expect(
+      parseDeepLink(
+        "hermes://open?cwd=" + encodeURIComponent("\\\\server\\share"),
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseDeepLink("hermes://open?cwd=" + encodeURIComponent("//server/share"))
+        .ok,
+    ).toBe(false);
   });
 
   it("rejects a malformed repo", () => {
@@ -133,14 +136,12 @@ describe("parseMentionQuery", () => {
 
 describe("filterMentionCandidates", () => {
   it("ranks prefix matches before mid-path substring matches", () => {
-    const files = [
-      "components/Button.tsx",
-      "src/MyComp.tsx",
-      "x/comp.ts",
-    ];
+    const files = ["components/Button.tsx", "src/MyComp.tsx", "x/comp.ts"];
     const out = filterMentionCandidates(files, "comp", 8);
     // "x/comp.ts" basename starts with comp -> prefix; should rank above MyComp substring
-    expect(out.indexOf("x/comp.ts")).toBeLessThan(out.indexOf("src/MyComp.tsx"));
+    expect(out.indexOf("x/comp.ts")).toBeLessThan(
+      out.indexOf("src/MyComp.tsx"),
+    );
   });
 
   it("is case-insensitive and respects the limit", () => {

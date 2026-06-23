@@ -105,7 +105,13 @@ export function ciSummary(checks: CiCheck[]): CiSummary {
     }
   }
   const state: CiSummary["state"] =
-    failed > 0 ? "failing" : pending > 0 ? "pending" : passed > 0 ? "passing" : "pending";
+    failed > 0
+      ? "failing"
+      : pending > 0
+        ? "pending"
+        : passed > 0
+          ? "passing"
+          : "pending";
   return { state, passed, failed, pending };
 }
 
@@ -138,7 +144,10 @@ const INACTIVE: MentionQuery = { active: false, query: "", start: -1 };
  * an "@" preceded by start-of-string or whitespace and runs to the caret with
  * no intervening whitespace.
  */
-export function parseMentionQuery(text: string, caretIndex: number): MentionQuery {
+export function parseMentionQuery(
+  text: string,
+  caretIndex: number,
+): MentionQuery {
   if (typeof text !== "string") return INACTIVE;
   const caret = Math.max(0, Math.min(caretIndex, text.length));
   const before = text.slice(0, caret);

@@ -90,7 +90,10 @@ describe("applyVerifyEvent", () => {
 
   it("verify.done with all checks ok -> passed", () => {
     let s = applyVerifyEvent(initialPreviewState(), { type: "verify.start" });
-    s = applyVerifyEvent(s, { type: "verify.check", payload: { kind: "dom", ok: true } });
+    s = applyVerifyEvent(s, {
+      type: "verify.check",
+      payload: { kind: "dom", ok: true },
+    });
     s = applyVerifyEvent(s, {
       type: "verify.check",
       payload: { kind: "click", ok: true },

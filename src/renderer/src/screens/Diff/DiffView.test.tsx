@@ -25,7 +25,9 @@ describe("DiffView", () => {
     render(<DiffView patch={PATCH} />);
     const rows = screen.getAllByTestId("diff-file-row");
     expect(rows).toHaveLength(2);
-    const badges = screen.getAllByTestId("diff-file-badge").map((b) => b.textContent);
+    const badges = screen
+      .getAllByTestId("diff-file-badge")
+      .map((b) => b.textContent);
     expect(badges).toContain("+3 -1");
     expect(badges).toContain("+0 -2");
   });

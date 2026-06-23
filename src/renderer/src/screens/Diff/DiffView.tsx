@@ -11,7 +11,12 @@ import {
   type CommentAnchor,
   type DiffSide,
 } from "../../../../shared/review-anchor";
-import { ChevronRight, ExternalLink, FileText, Folder } from "../../assets/icons";
+import {
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Folder,
+} from "../../assets/icons";
 
 export interface DiffViewProps {
   /** A unified/git diff string. */
@@ -23,7 +28,12 @@ export interface DiffViewProps {
   /** Existing inline review comments to render against the active file. */
   comments?: CommentAnchor[];
   /** Called when the user submits a new inline comment on a line. */
-  onAddComment?: (path: string, side: DiffSide, lineNo: number, text: string) => void;
+  onAddComment?: (
+    path: string,
+    side: DiffSide,
+    lineNo: number,
+    text: string,
+  ) => void;
   /** Called when the user clicks "Review code" (agent self-review). */
   onReviewCode?: (path: string) => void;
   /** Optional translator; defaults to identity so the component is usable bare. */
@@ -81,7 +91,11 @@ export function DiffView({
       </div>
 
       <div className="diff-body">
-        <ul className="diff-file-list" role="listbox" aria-label={t("diff.files")}>
+        <ul
+          className="diff-file-list"
+          role="listbox"
+          aria-label={t("diff.files")}
+        >
           {files.map((f, i) => (
             <li key={`${f.path}:${i}`}>
               <button
@@ -89,7 +103,8 @@ export function DiffView({
                 role="option"
                 aria-selected={i === selected}
                 className={
-                  "diff-file-row" + (i === selected ? " diff-file-row-active" : "")
+                  "diff-file-row" +
+                  (i === selected ? " diff-file-row-active" : "")
                 }
                 data-testid="diff-file-row"
                 onClick={() => setSelected(i)}
@@ -194,7 +209,9 @@ export function DiffView({
                       <td
                         className={
                           "diff-sbs-cell diff-sbs-right" +
-                          (row.right ? " diff-" + row.right.kind : " diff-blank") +
+                          (row.right
+                            ? " diff-" + row.right.kind
+                            : " diff-blank") +
                           (onAddComment && rightLine !== undefined
                             ? " diff-commentable"
                             : "")
@@ -218,7 +235,8 @@ export function DiffView({
                         <td colSpan={3}>
                           <div
                             className={
-                              "diff-comment" + (c.orphaned ? " diff-comment-orphaned" : "")
+                              "diff-comment" +
+                              (c.orphaned ? " diff-comment-orphaned" : "")
                             }
                             data-testid="diff-comment"
                           >

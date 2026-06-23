@@ -32,7 +32,9 @@ const KNOWN_AGENT_EVENT_TYPES = new Set([
 ]);
 
 /** Map a chat tool event's status to a task lifecycle state. */
-function toolState(status: ChatToolEvent["status"]): "running" | "succeeded" | "failed" {
+function toolState(
+  status: ChatToolEvent["status"],
+): "running" | "succeeded" | "failed" {
   if (status === "completed") return "succeeded";
   if (status === "failed") return "failed";
   return "running";

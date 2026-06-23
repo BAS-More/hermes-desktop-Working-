@@ -98,7 +98,7 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
   let sawDevNullOld = false;
   let sawDevNullNew = false;
 
-  const finishFile = () => {
+  const finishFile = (): void => {
     if (!cur) return;
     // Resolve status now that we've seen the headers.
     if (renameFrom && renameTo) {
@@ -170,7 +170,8 @@ export function parseUnifiedDiff(patch: string): FileDiff[] {
     if (raw.startsWith("+++ ")) {
       const p = raw.slice(4).trim();
       if (p === DEV_NULL) sawDevNullNew = true;
-      else if (cur && (!cur.path || sawDevNullOld)) cur.path = stripGitPrefix(p);
+      else if (cur && (!cur.path || sawDevNullOld))
+        cur.path = stripGitPrefix(p);
       continue;
     }
 

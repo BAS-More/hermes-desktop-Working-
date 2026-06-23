@@ -29,7 +29,8 @@ const SECTIONS: RightPanelSection[] = [
 ];
 
 function statusIcon(status: string): React.JSX.Element {
-  if (status === "completed") return <Check className="todo-icon todo-done" aria-hidden />;
+  if (status === "completed")
+    return <Check className="todo-icon todo-done" aria-hidden />;
   if (status === "in_progress")
     return <Clock className="todo-icon todo-active" aria-hidden />;
   if (status === "cancelled")
@@ -59,15 +60,26 @@ export function RightPanel({
   const active = panel.activeSection;
 
   return (
-    <aside className="right-panel" data-testid="right-panel" aria-label={t("panel.title")}>
-      <nav className="right-panel-tabs" role="tablist" aria-label={t("panel.sections")}>
+    <aside
+      className="right-panel"
+      data-testid="right-panel"
+      aria-label={t("panel.title")}
+    >
+      <nav
+        className="right-panel-tabs"
+        role="tablist"
+        aria-label={t("panel.sections")}
+      >
         {SECTIONS.map((s) => (
           <button
             key={s}
             type="button"
             role="tab"
             aria-selected={s === active}
-            className={"right-panel-tab" + (s === active ? " right-panel-tab-active" : "")}
+            className={
+              "right-panel-tab" +
+              (s === active ? " right-panel-tab-active" : "")
+            }
             data-testid={`panel-tab-${s}`}
             onClick={() => setPanel((p) => setActiveSection(p, s))}
           >
@@ -189,7 +201,10 @@ export function RightPanel({
         )}
 
         {active === "usage" && (
-          <section className="panel-section usage-ring" data-testid="usage-ring">
+          <section
+            className="panel-section usage-ring"
+            data-testid="usage-ring"
+          >
             <div className="usage-metric">
               <span className="usage-label">{t("panel.context")}</span>
               <span className="usage-value" data-testid="usage-context">

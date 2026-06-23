@@ -581,7 +581,7 @@ function Chat({
     });
   }, [t]);
 
-  const agentPanel = useAgentPanel();
+  const agentPanel = useAgentPanel(chatCurrentModel);
 
   const dashboardTransport = useDashboardChatTransport({
     activeTurnRef,

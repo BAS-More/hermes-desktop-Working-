@@ -46,7 +46,9 @@ describe("DiffView — inline collaboration (P2)", () => {
   it("submit is disabled until the comment has text", () => {
     render(<DiffView patch={PATCH} onAddComment={vi.fn()} />);
     fireEvent.click(screen.getAllByTestId("diff-line-right")[1]);
-    const submit = screen.getByTestId("diff-comment-submit") as HTMLButtonElement;
+    const submit = screen.getByTestId(
+      "diff-comment-submit",
+    ) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
     fireEvent.change(screen.getByTestId("diff-comment-input"), {
       target: { value: "x" },
@@ -59,9 +61,9 @@ describe("DiffView — inline collaboration (P2)", () => {
     const anchor = anchorComment(fileA, "new", 2, "off-by-one risk", "c1");
     render(<DiffView patch={PATCH} comments={[anchor]} />);
     const rendered = screen.getAllByTestId("diff-comment");
-    expect(rendered.some((n) => n.textContent?.includes("off-by-one risk"))).toBe(
-      true,
-    );
+    expect(
+      rendered.some((n) => n.textContent?.includes("off-by-one risk")),
+    ).toBe(true);
   });
 
   it("flags an orphaned comment with a warning marker", () => {

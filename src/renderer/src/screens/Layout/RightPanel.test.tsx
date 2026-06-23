@@ -53,9 +53,9 @@ describe("RightPanel — always-visible todo", () => {
       },
     });
     rerender(<RightPanel state={next} />);
-    expect(screen.getByTestId("todo-item-t1").getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByTestId("todo-item-t1").getAttribute("aria-checked"),
+    ).toBe("true");
     expect(screen.getByTestId("todo-progress").textContent).toContain("1/2");
   });
 
@@ -82,7 +82,9 @@ describe("RightPanel — always-visible todo", () => {
     });
     render(<RightPanel state={state} initialSection="usage" />);
     const usage = screen.getByTestId("usage-ring");
-    expect(within(usage).getByTestId("usage-context").textContent).toContain("42");
+    expect(within(usage).getByTestId("usage-context").textContent).toContain(
+      "42",
+    );
     expect(within(usage).getByTestId("usage-plan").textContent).toContain("17");
   });
 

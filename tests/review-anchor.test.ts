@@ -78,10 +78,7 @@ describe("reanchor", () => {
       "c1",
     );
     // new file: dup at line 2 and line 6; nearest to 5 is 6
-    const out = reanchor(
-      [start],
-      fileWith(["x", "dup", "y", "z", "w", "dup"]),
-    );
+    const out = reanchor([start], fileWith(["x", "dup", "y", "z", "w", "dup"]));
     expect(out[0].lineNo).toBe(6);
   });
 
@@ -104,8 +101,14 @@ describe("reanchor", () => {
 describe("commentsForLine", () => {
   const anchors: CommentAnchor[] = [
     anchorComment(fileWith(["a", "b", "c"]), "new", 3, "n", "1"),
-    { ...anchorComment(fileWith(["a", "b", "c"]), "new", 3, "o", "2"), side: "old" },
-    { ...anchorComment(fileWith(["a", "b", "c"]), "new", 3, "p", "3"), path: "b.ts" },
+    {
+      ...anchorComment(fileWith(["a", "b", "c"]), "new", 3, "o", "2"),
+      side: "old",
+    },
+    {
+      ...anchorComment(fileWith(["a", "b", "c"]), "new", 3, "p", "3"),
+      path: "b.ts",
+    },
   ];
 
   it("filters by path, side and line", () => {
