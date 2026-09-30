@@ -22,9 +22,10 @@ export default defineConfig({
     // the pool to half the cores leaves headroom for the spawned children, so
     // wall-clock per test stays bounded and the races disappear.
     pool: "forks",
-    poolOptions: {
-      forks: { maxForks: 4, minForks: 1 },
-    },
+    // Vitest 4: pool options are top-level (poolOptions was removed). maxWorkers
+    // caps concurrent fork workers so spawned child processes don't oversubscribe.
+    maxWorkers: 4,
+    minWorkers: 1,
     // Safety ceiling for the genuinely process-heavy tests; with contention
     // capped above, normal tests finish in milliseconds and only real spawns
     // approach this. Not a substitute for the pool cap — both matter.
